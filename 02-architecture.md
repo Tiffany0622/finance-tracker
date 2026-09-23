@@ -5,7 +5,7 @@
 | 文件版本 | v0.2 |
 | 建立 / 更新日期 | 2026-09-23 |
 | 需求基準 | [01-requirements.md](01-requirements.md) v0.4 |
-| 狀態 | 架構基線；Phase 0 已有程式與原生環境驗證，容器 / 常駐部署待驗；詳見 docs/verification/phase-0.md |
+| 狀態 | 架構基線；Phase 0 已通過原生環境及遠端 Linux CI，Mac 容器 / 常駐部署待驗；詳見 docs/verification/phase-0.md |
 | 配套文件 | [03-data-model.md](03-data-model.md)、[04-dev-plan.md](04-dev-plan.md) |
 
 ## 1. 架構決策與範圍

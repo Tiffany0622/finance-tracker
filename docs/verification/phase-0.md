@@ -1,6 +1,6 @@
 # Phase 0 驗證紀錄
 
-日期：2026-09-23。驗證對象為與此紀錄同次提交的 Phase 0 程式。所有資料與帳號皆為虛構測試資料；未匯入使用者財務資料、未建立正式登入帳號、未啟用外部整合。
+日期：2026-09-23。驗證對象為 Phase 0 程式，最終程式提交 `675a18be1f545f1b3042fe6e15c7ad3b9377395f`；後續本紀錄提交只補驗收文件。所有資料與帳號皆為虛構測試資料；未匯入使用者財務資料、未建立正式登入帳號、未啟用外部整合。
 
 ## 結果
 
@@ -19,8 +19,18 @@
 | 容器平台中繼資料 | PostgreSQL、Node、Nginx 指定 digest 的映像清單含 linux/arm64；這不是實際容器啟動驗收 |
 | 本機環境檔 | 隨機機密生成、權限 600、重跑拒絕覆寫通過；機密值未輸出至紀錄或 Git |
 | 啟動腳本 / plist | shell 語法檢查通過；以 Docker 路徑替身生成 plist，`plutil -lint` 通過；未載入 launchd |
+| GitHub Actions 乾淨 checkout | **通過**：Ubuntu 24.04 / x86_64 重現 22 項後端、2 項前端、2 項瀏覽器測試及生成契約無漂移 |
+| Linux 容器實際啟動 | **通過**：CI 完成 Compose build、migration、API / Web HTTP health，主機 `127.0.0.1:8080/api/health/ready` 可連入；不等同 Mac arm64 容器驗收 |
 
 後端仍有 1 個非阻斷的第三方警告：Starlette 提示未來 TestClient 將改用 httpx2。已鎖定的 httpx 0.28.1 在本次測試可用；升級時需連同 TestClient 相容性驗證，不以隱藏警告冒充已解決。
+
+### 遠端 CI 證據
+
+[GitHub Actions 成功執行 #35847379622](https://github.com/Tiffany0622/finance-tracker/actions/runs/35847379622)，對應程式提交 `675a18b`。後端 22 項測試 9.58 秒、瀏覽器 2 項測試 9.7 秒；容器建置、遷移與 Web 入口皆成功。
+
+首次遠端驗證揭露 pytest 依賴本機 `PYTHONPATH`；已改由專案 pytest 設定提供來源路徑，並在取消本機環境變數後確認可載入全部測試。容器驗證另揭露 Web 只接 internal 網路時主機入口不可用；已讓 Nginx 同時接 edge bridge / private network，保留 loopback port 限制並加入真正 HTTP 健康檢查。修正後完整流程重跑通過。
+
+CI 臨時金鑰每次隨機產生並遮罩，不使用本機 `.env` 或正式憑證。GitHub 另提示部分 action 宣告 Node 20，runner 已使用 Node 24 並通過；未來更新 action 版本時重新驗證。
 
 ## 已驗證的主要行為
 
@@ -46,14 +56,13 @@
 
 ## 尚未完成的驗收
 
-1. **Mac 上的 Linux arm64 容器實際建置 / 一鍵啟動。** 此環境沒有可用 Docker 引擎。Compose 解析通過和映像有 arm64 清單，只能證明設定及供應平台，不能宣稱服務已在容器執行。
-2. **GitHub Actions 首次遠端執行結果。** Workflow 已包含 backend / frontend / E2E / Compose build / container health smoke；提交後需查看遠端結果。本次本機通過不等於遠端 CI 已通過。
-3. **LaunchAgent 實際載入、登入自動啟動、Docker 引擎延遲啟動、Mac 闔蓋 / 喚醒。** 沒有修改使用者的常駐或電源設定。
-4. **實際另一顆磁碟 / NAS。** 目前只有隔離測試目錄的成功還原；正式 `BACKUP_HOST_DIR`、掛載狀態及權限仍需選定及驗證。
-5. **iPhone Safari、私人遠端存取、Numbers。** 此階段只驗證 Chrome 觸控尺寸；真實 iPhone 的 RV-06 在 Phase 1、Numbers 匯出在 Phase 1 / 1.5。
-6. **Phase 1 財務表與報表。** 目前無正式交易 / 分錄 / 報表；D1-08 必須把帳務不變量與代表性報表加入備份還原演練。
+1. **Mac 上的 Linux arm64 容器實際建置 / 一鍵啟動。** 此環境沒有可用 Docker 引擎。CI 的 Linux x86_64 容器已通過；Compose 解析及 arm64 映像清單仍不能代替 Mac 容器實測。
+2. **LaunchAgent 實際載入、登入自動啟動、Docker 引擎延遲啟動、Mac 闔蓋 / 喚醒。** 沒有修改使用者的常駐或電源設定。
+3. **實際另一顆磁碟 / NAS。** 目前只有隔離測試目錄的成功還原；正式 `BACKUP_HOST_DIR`、掛載狀態及權限仍需選定及驗證。
+4. **iPhone Safari、私人遠端存取、Numbers。** 此階段只驗證 Chrome 觸控尺寸；真實 iPhone 的 RV-06 在 Phase 1、Numbers 匯出在 Phase 1 / 1.5。
+5. **Phase 1 財務表與報表。** 目前無正式交易 / 分錄 / 報表；D1-08 必須把帳務不變量與代表性報表加入備份還原演練。
 
-目前結論為「Phase 0 程式及原生環境主要流程已驗證，部署驗收待完成」，不是整個 Phase 0 已完全 DONE。
+目前結論為「Phase 0 程式、原生環境主要流程與遠端 Linux CI 已驗證，Mac 部署及主機驗收待完成」，不是整個 Phase 0 已完全 DONE。
 
 ## 畫面證據
 
@@ -67,3 +76,4 @@
 - [FastAPI 認證範例](https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/)、[Docker Compose 啟動依賴](https://docs.docker.com/compose/how-tos/startup-order/)。
 - [uv Docker 整合](https://docs.astral.sh/uv/guides/integration/docker/)、[Vite 執行環境](https://vite.dev/guide/)、[pnpm 設定](https://pnpm.io/settings)。
 - [Compose one-off command 與環境檔](https://docs.docker.com/reference/cli/docker/compose/run/)。
+- [Docker 多網路連接](https://docs.docker.com/engine/network/)、[loopback 連接埠發佈](https://docs.docker.com/engine/network/port-publishing/)。
