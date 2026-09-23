@@ -1,0 +1,96 @@
+name: Phase 0 checks
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16.15-bookworm@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
+        env:
+          POSTGRES_USER: finance_test
+          POSTGRES_PASSWORD: synthetic-ci-only
+          POSTGRES_DB: finance_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U finance_test -d finance_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://finance_test:synthetic-ci-only@localhost:5432/finance_test
+      TEST_DATABASE_URL: postgresql+psycopg://finance_test:synthetic-ci-only@localhost:5432/finance_test
+      APP_ORIGIN: http://localhost:5173
+      COOKIE_SECURE: 'false'
+      DATA_DIR: /tmp/finance-ci-data
+      BACKUP_DIR: /tmp/finance-ci-backups
+      E2E_CHANNEL: chromium
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.18'
+          python-version: '3.12.14'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.19.0'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.19.0'
+      - name: Install locked dependencies
+        run: |
+          uv sync --project backend --frozen
+          pnpm --dir frontend install --frozen-lockfile
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16
+          echo '/usr/lib/postgresql/16/bin' >> "$GITHUB_PATH"
+          mkdir -p "$DATA_DIR" "$BACKUP_DIR"
+          backend/.venv/bin/python - <<'PY'
+          import os, secrets
+          from cryptography.fernet import Fernet
+          with open(os.environ['GITHUB_ENV'], 'a') as out:
+              out.write('JWT_SECRET=' + secrets.token_hex(32) + '\n')
+              out.write('TOTP_KEY=' + Fernet.generate_key().decode() + '\n')
+          PY
+      - name: Backend checks and PostgreSQL restore drill
+        run: sh scripts/check-backend.sh
+      - name: Frontend checks and generated contract drift
+        run: |
+          pnpm --dir frontend api:generate
+          git diff --exit-code -- backend/openapi.json frontend/src/api/schema.d.ts
+          pnpm --dir frontend test
+          pnpm --dir frontend build
+      - name: Browser checks with real API and worker
+        run: |
+          pnpm --dir frontend exec playwright install --with-deps chromium
+          cd backend
+          .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log > /tmp/finance-api.log 2>&1 &
+          .venv/bin/python -m app.worker > /tmp/finance-worker.log 2>&1 &
+          cd ../frontend
+          pnpm dev > /tmp/finance-web.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:5173/api/health/ready >/dev/null; then break; fi
+            sleep 1
+          done
+          pnpm test:e2e
+      - name: Compose config and container build
+        run: |
+          python3 scripts/configure.py
+          docker compose config --quiet
+          docker compose build
+          mkdir -p data/app/attachments data/backups
+          env -u DATABASE_URL -u JWT_SECRET -u TOTP_KEY -u APP_ORIGIN -u DATA_DIR -u BACKUP_DIR \
+            docker compose up -d --no-build --wait
+          curl --fail http://localhost:8080/api/health/ready
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: synthetic-browser-traces
+          path: frontend/test-results
+          retention-days: 7

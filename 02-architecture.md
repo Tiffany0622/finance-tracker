@@ -2,10 +2,10 @@
 
 | 項目 | 內容 |
 |---|---|
-| 文件版本 | v0.1 |
+| 文件版本 | v0.2 |
 | 建立 / 更新日期 | 2026-09-23 |
 | 需求基準 | [01-requirements.md](01-requirements.md) v0.4 |
-| 狀態 | 可供開發拆解的架構基線；個人設定與待決定事項見 §12，尚未實作或完成環境驗證 |
+| 狀態 | 架構基線；Phase 0 已有程式與原生環境驗證，容器 / 常駐部署待驗；詳見 docs/verification/phase-0.md |
 | 配套文件 | [03-data-model.md](03-data-model.md)、[04-dev-plan.md](04-dev-plan.md) |
 
 ## 1. 架構決策與範圍
@@ -151,7 +151,7 @@ PDF worker 使用本地可信任 HTML、字型及繪圖 bundle；以結構化參
 
 - 前綴 `/api/v1`；OpenAPI 是型別契約來源，產生前端型別並以 CI 檢查漂移。
 - 金額 / 匯率 / 數量以十進位字串傳輸；UTC timestamp 使用帶時區 ISO 8601，帳務日期使用 `YYYY-MM-DD`。圖表可轉為 JS number 繪圖，顯示及合計使用後端字串結果。
-- 寫入要求冪等鍵；同鍵同內容回傳原結果，同鍵不同內容回 `409 idempotency_conflict`。編輯帶 `expected_revision`，過期回 `409 revision_conflict`。
+- 財務寫入與排入工作要求冪等鍵；同鍵同內容回傳原結果，同鍵不同內容回 `409 idempotency_conflict`。編輯帶 `expected_revision`，過期回 `409 revision_conflict`。Phase 0 設定採 PUT + revision；登入 / refresh / TOTP 使用各自的 session / 一次性驗證規則，不重放認證結果。
 - 清單使用 cursor 分頁，預設 50、上限 200；穩定排序含 ID，禁止無限制全部載入。
 - 錯誤格式 `{code, message, field_errors, request_id}`；區分 `401/403`、`409`、`422`、`429`、`503`。不要回傳 token、SQL 或內部路徑。
 
@@ -199,7 +199,7 @@ PDF worker 使用本地可信任 HTML、字型及繪圖 bundle；以結構化參
 
 ## 9. 備份、還原與資料生命週期
 
-E-07 使用每日 `pg_dump` + 附件 manifest。備份期間取得全系統寫入維護鎖，暫停 API / worker 寫帳及附件刪除；使用者讀取可持續。完成一致 DB dump 與所需不可變附件清單後，複製 / 校驗附件，再發佈完整備份標記。失敗不得把半成品標為成功。[PostgreSQL 備份說明](https://www.postgresql.org/docs/16/backup-dump.html)
+E-07 使用每日 `pg_dump` + 附件 manifest。備份期間取得全系統寫入維護鎖，暫停 API / worker 業務寫入及附件刪除；使用者讀取可持續。Job 心跳只更新 lease 中繼資料，可繼續以防長備份造成誤判逾時；不得藉此寫入業務資料。完成一致 DB dump 與所需不可變附件清單後，複製 / 校驗附件，再發佈完整備份標記。失敗不得把半成品標為成功。[PostgreSQL 備份說明](https://www.postgresql.org/docs/16/backup-dump.html)
 
 - 保存 schema version、app commit、DB 版本、manifest、SHA-256 與完成時間。目標為另一磁碟或 NAS，保留 30 天；同磁碟暫存不能宣稱具備磁碟故障保護。
 - 備份包含原始收據、必要設定、帳本與月結快照；機密另行加密保管。Notion、一般報表檔案及 CSV 不能取代備份。
@@ -226,7 +226,7 @@ E-07 使用每日 `pg_dump` + 附件 manifest。備份期間取得全系統寫�
 ## 11. 開發、Git 與部署邊界
 
 - 檔案採需求規劃的 `backend/`、`frontend/`、`bot/`、`scripts/`、`data/`；增加 `ledger/`、`report_exports/`，`notion_sync/` 到 P2 才建。
-- `AGENTS.md` 在 Phase 0 建立，記錄真實可執行的啟動、測試及 migration 指令；未建立前不把文件中的預計命令當成已可執行。
+- `AGENTS.md` 已在 Phase 0 建立，記錄啟動、測試及 migration 指令；需要先滿足 README 的環境條件。
 - 重要財務與 schema 改動先有驗收案例；前端用 API 契約與虛構資料開發。工作完成需實際操作主流程，不只看編譯成功。
 - Git 保存程式、文件、migration、lockfile 及去識別化 fixtures；排除 `.env`、DB、收據、備份、匯出、模型檔、日誌與瀏覽器登入狀態。
 - 開發用 skills / Agent 不是產品執行依賴。App 啟動及排程不依賴 Codex 開著，也不依賴開發用 Notion 插件。按需分工方式見 04。
@@ -255,3 +255,11 @@ E-07 使用每日 `pg_dump` + 附件 manifest。備份期間取得全系統寫�
 - [ECharts 渲染方式](https://echarts.apache.org/handbook/en/how-to/cross-platform/server/)、[XlsxWriter 圖表](https://xlsxwriter.readthedocs.io/working_with_charts.html)、[Playwright PDF](https://playwright.dev/python/docs/api/class-page#page-pdf)。
 - [Ollama 官方 FAQ](https://docs.ollama.com/faq#how-do-i-use-ollama-with-gpu-acceleration-in-docker)：macOS Docker GPU 限制是採原生 Ollama 的原因。
 - Numbers / Notion 相容性依據與 RV-01～RV-08 見需求 §2.5.1。
+
+## 14. Phase 0 實作記錄
+
+- 實際依賴鎖定於 `backend/uv.lock`、`frontend/pnpm-lock.yaml`；原生 Python 3.12.14、Node 24.19.0、PostgreSQL 16.15 已用於驗證。
+- 容器後端以 PostgreSQL 16.15 映像搭配 uv 管理的 Python 3.12.14，確保 pg_dump / pg_restore 與 DB 同版；Node、PostgreSQL、Nginx 映像已固定 digest，平台清單含 linux/arm64。映像平台資料不等於已通過 Mac 容器執行驗收。
+- Phase 0 的 Compose 網路設 internal；未來需要外部 API 時才增加受控對外網路。開發 Vite 5173 / API 8000 僅綁 loopback；正式本機 Web 8080 經 Nginx。
+- 認證將 refresh token 歷史與撤銷狀態拆成 `auth_sessions` / `session_families`，支援輪替後舊 token 重放時撤銷整個 family。Schema 的精確映射見 03 §14。
+- 各項通過與未驗證的證據見 [Phase 0 驗證紀錄](docs/verification/phase-0.md)。本紀錄不代表 Phase 1 的帳務、圖表或附件功能已完成。

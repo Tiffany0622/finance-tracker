@@ -2,11 +2,11 @@
 
 | 項目 | 內容 |
 |---|---|
-| 文件版本 | v0.1 |
+| 文件版本 | v0.2 |
 | 建立 / 更新日期 | 2026-09-23 |
 | 需求基準 | [01-requirements.md](01-requirements.md) v0.4 |
-| 設計基準 | [02-architecture.md](02-architecture.md)、[03-data-model.md](03-data-model.md) v0.1 |
-| 目前狀態 | 規劃文件已建立；以下實作任務全部待辦，尚未建立應用程式、資料庫或通過功能驗收 |
+| 設計基準 | [02-architecture.md](02-architecture.md)、[03-data-model.md](03-data-model.md) v0.2 |
+| 目前狀態 | Phase 0 程式已實作並通過原生整合 / 瀏覽器測試；部署驗收尚未全數完成，見 docs/verification/phase-0.md |
 | 使用方式 | 依任務前置關係逐項實作；每次更新狀態、驗收證據與相關 commit，不以文件存在代表功能完成 |
 
 ## 1. 交付原則與範圍
@@ -34,7 +34,7 @@
 
 ### 1.2 狀態與完成標準
 
-狀態使用：`TODO` 待辦、`DOING` 執行中、`VERIFY` 實作完成待驗證、`BLOCKED` 缺必要條件、`DONE` 已驗收。下表全部為 `TODO`。
+狀態使用：`TODO` 待辦、`DOING` 執行中、`VERIFY` 實作完成待驗證、`BLOCKED` 缺必要條件、`DONE` 已驗收。各任務依實際驗證更新；後續 Phase 1 起仍為 `TODO`。
 
 任務改為 DONE 前需同時滿足：需求行為完成、正常與重要失敗路徑驗證、schema / 型別相容、無真實憑證與財務資料入版控、文件同步，以及必要實機驗收。記錄證據格式為「任務 ID / commit / 指令與結果 / 環境 / 人工操作結果 / 未解限制」。Phase 0 建立 `docs/verification/` 保存去識別化驗證記錄；本文件與其餘三份基準文件仍在根目錄。
 
@@ -46,13 +46,26 @@
 
 | 任務 | 需求 | 前置任務 | 交付與驗收 | 狀態 |
 |---|---|---|---|---|
-| D0-01 | 非功能：部署、可維護性 | — | 建 backend / frontend / scripts、README、AGENTS.md、依賴 lockfile、.env.example、.gitignore；Apple Silicon 建置冒煙測試，記錄版本與啟動命令 | TODO |
-| D0-02 | 非功能：資料私有、安全 | D0-01 | Compose 內網 DB、Alembic 初始 migration、健康檢查、設定分層；DB 無公開 port；owner / session / audit / job 基礎表可重建 | TODO |
-| D0-03 | 非功能：登入、TOTP、RWD | D0-02 | 首次 CLI 設密碼、登入 / refresh / 登出、可選 TOTP、CSRF 與 owner 檢查；Web 繁中殼與設定引導；無公開註冊及預設密碼 | TODO |
-| D0-04 | 非功能：可靠性、常駐與睡眠 | D0-02 | 持久化 job、lease、重試、冪等與 outbox；驗證執行中 kill / 重啟不丟工作、重領不重複業務效果；記錄失敗狀態 | TODO |
-| D0-05 | E-07 | D0-02, D0-04 | 一致備份 / 校驗 / 隔離還原腳本、30 天 retention、版本 manifest；先驗空殼資料，附件與實際帳本的驗收在 D1-08 | TODO |
-| D0-06 | 非功能：品質、部署 | D0-01, D0-02, D0-03, D0-04 | GitHub Actions：lint、型別、pytest、真 PG 整合、frontend build；虛構 seed、OpenAPI 型別產生、驗證記錄目錄；乾淨 checkout 可重現 | TODO |
-| D0-07 | 非功能：常駐、私有、安全 | D0-03, D0-04, D0-05 | launchd 啟動與 Docker runtime 就緒等待；Mac 睡眠 / 喚醒補跑、磁碟不足與備份過期狀態；遠端方案依 Q8 配置與驗證，不預設暴露公網 | TODO |
+| D0-01 | 非功能：部署、可維護性 | — | 建 backend / frontend / scripts、README、AGENTS.md、依賴 lockfile、.env.example、.gitignore；Apple Silicon 建置冒煙測試，記錄版本與啟動命令 | VERIFY |
+| D0-02 | 非功能：資料私有、安全 | D0-01 | Compose 內網 DB、Alembic 初始 migration、健康檢查、設定分層；DB 無公開 port；owner / session / audit / job 基礎表可重建 | VERIFY |
+| D0-03 | 非功能：登入、TOTP、RWD | D0-02 | 首次 CLI 設密碼、登入 / refresh / 登出、可選 TOTP、CSRF 與 owner 檢查；Web 繁中殼與設定引導；無公開註冊及預設密碼 | DONE |
+| D0-04 | 非功能：可靠性、常駐與睡眠 | D0-02 | 持久化 job、lease、重試、冪等與 outbox；驗證執行中 kill / 重啟不丟工作、重領不重複業務效果；記錄失敗狀態 | DONE |
+| D0-05 | E-07 | D0-02, D0-04 | 一致備份 / 校驗 / 隔離還原腳本、30 天 retention、版本 manifest；先驗空殼資料，附件與實際帳本的驗收在 D1-08 | DONE |
+| D0-06 | 非功能：品質、部署 | D0-01, D0-02, D0-03, D0-04 | GitHub Actions：lint、型別、pytest、真 PG 整合、frontend build；虛構 seed、OpenAPI 型別產生、驗證記錄目錄；乾淨 checkout 可重現 | VERIFY |
+| D0-07 | 非功能：常駐、私有、安全 | D0-03, D0-04, D0-05 | launchd 啟動與 Docker runtime 就緒等待；Mac 睡眠 / 喚醒補跑、磁碟不足與備份過期狀態；遠端方案依 Q8 配置與驗證，不預設暴露公網 | VERIFY |
+
+### Phase 0 驗證補充（2026-09-23）
+
+[驗證紀錄與未完成清單](docs/verification/phase-0.md) 是本階段狀態依據。
+
+- D0-03：登入 / TOTP / CSRF / 撤銷 / owner 檢查、設定頁與桌面 / 觸控尺寸瀏覽器流程通過；實際 iPhone Safari 留在 RV-06 的 Phase 1 驗收。
+- D0-04：持久化佇列、冪等、outbox、同時領取、程序退出後恢復及 lease fencing 通過。
+- D0-05：Phase 0 核心資料及虛構附件完成 dump → 還原 → 核對 → 登入演練，30 天保留策略通過；正式帳本 / 真實備份磁碟仍按 D1-08 驗收。
+- D0-01 / D0-02：原生 arm64 環境與 DB 已驗證，Compose 設定檢查通過；Mac 容器引擎尚不可用，因此 Linux arm64 容器建置 / 一鍵啟動仍為 VERIFY。
+- D0-06：Ruff、mypy、pytest、migration drift、TypeScript、前端建置、生成契約及瀏覽器檢查已跑；GitHub Actions 已建立，遠端首次執行結果需另查。
+- D0-07：啟動 / 等待引擎 / plist 產生腳本已交付；尚未安裝 LaunchAgent、變更主機睡眠設定或確認私人遠端方案。不能以自動化的重啟 / 過期工作測試取代實際闔蓋測試。
+
+因此 Phase 0 **尚未完全驗收**；不要把整個里程碑標為 DONE。完成容器與主機驗收後，再依原順序正式交付 Phase 1。
 
 ## 3. Phase 1：手動記帳、Web 圖表與 CSV
 

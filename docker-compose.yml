@@ -1,0 +1,77 @@
+name: finance-tracker
+x-app: &app
+  image: finance-tracker-backend:local
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+  environment: &environment
+    DATABASE_URL: ${DATABASE_URL:?Run scripts/configure.py first}
+    JWT_SECRET: ${JWT_SECRET:?Run scripts/configure.py first}
+    TOTP_KEY: ${TOTP_KEY:?Run scripts/configure.py first}
+    APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8080}
+    COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    DATA_DIR: /data
+    BACKUP_DIR: /backups
+    APP_COMMIT: ${APP_COMMIT:-development}
+  networks: [private]
+  init: true
+  user: "${APP_UID:-10001}:${APP_GID:-10001}"
+  security_opt: [no-new-privileges:true]
+  volumes:
+    - ./data/app:/data
+    - ${BACKUP_HOST_DIR:-./data/backups}:/backups
+services:
+  db:
+    image: postgres:16.15-bookworm@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Run scripts/configure.py first}
+      APP_DB_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/configure.py first}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./scripts/docker/init-db.sh:/docker-entrypoint-initdb.d/01-app.sh:ro
+    networks: [private]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -U finance -d finance"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  migrate:
+    <<: *app
+    command: [alembic, upgrade, head]
+    depends_on:
+      db: {condition: service_healthy}
+    restart: 'no'
+  api:
+    <<: *app
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  worker:
+    <<: *app
+    command: [python, -m, app.worker]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    restart: unless-stopped
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports: ["127.0.0.1:8080:8080"]
+    networks: [private]
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+networks:
+  private:
+    internal: true
+volumes:
+  db_data:

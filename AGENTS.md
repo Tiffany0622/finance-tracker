@@ -1,0 +1,54 @@
+# Finance Tracker development
+
+Read `01-requirements.md`, `02-architecture.md`, `03-data-model.md`, `04-dev-plan.md` and the current verification record before changing scope. Keep those baseline documents in the repository root. Communication and UI are primarily Traditional Chinese.
+
+## Scope and data
+
+- Current implementation is Phase 0. Do not show unfinished financial metrics as zero or mark future requirements complete.
+- PostgreSQL is authoritative. Use real PostgreSQL integration tests, Decimal for financial values, migrations for schema changes, and backend-generated report snapshots in later phases.
+- Never commit `.env`, production data, attachments, backups, logs, local runtime downloads or browser sessions. Test fixtures must be synthetic.
+- Do not overwrite user changes or a real DB to make tests pass. `TEST_DATABASE_URL` must name a disposable `finance_test*` database. Tests truncate its app tables and create temporary `finance_restore_*` databases.
+- Do not ask for secrets in chat. Initial accounts are created by the interactive CLI; no default production account/password.
+
+## Commands
+
+Prerequisites: Python 3.12, uv 0.12.18, Node 24.19.0, pnpm 11.19.0, PostgreSQL 16 plus matching pg_dump / pg_restore on PATH.
+
+From root:
+
+```sh
+uv sync --project backend --frozen
+pnpm --dir frontend install --frozen-lockfile
+sh scripts/check-backend.sh
+pnpm --dir frontend api:generate
+pnpm --dir frontend test
+pnpm --dir frontend build
+```
+
+Set the documented database, secret and data-directory environment variables before backend checks. `DATABASE_URL` and `TEST_DATABASE_URL` must both point to the disposable test DB for the full check script.
+
+From `backend/`:
+
+```sh
+.venv/bin/alembic upgrade head
+.venv/bin/alembic check
+.venv/bin/python -m app.cli init-user
+.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log --no-proxy-headers
+.venv/bin/python -m app.worker
+```
+
+Run API and worker in separate terminals; Vite uses `pnpm --dir frontend dev` from root. Browser tests require the synthetic demo seed and the three processes, then `pnpm --dir frontend test:e2e`. Chrome desktop/mobile emulation does not substitute for actual iPhone Safari or Numbers validation.
+
+Compose startup: `python3 scripts/configure.py`, `sh scripts/start.sh`, then interactive init-user. Never run `docker compose down -v` against user data.
+
+## Implementation rules
+
+- API routes validate inputs/owner, services own transactions, repositories must not commit independently. All business writers use `core.db.transaction()` to participate in backup maintenance locks.
+- Job heartbeat metadata may bypass the maintenance lock; financial writes and attachments may not. A handler must fence lease ownership and be safe after retries. External delivery is at least once, never promise exactly once.
+- Schema changes need a reviewed static Alembic revision. Update `SCHEMA_VERSION` with the expected head so API/worker reject mismatched schema. Do not use runtime `create_all` in production migrations.
+- Cookie mutations require CSRF and exact Origin. Don't expose tokens or secrets in exceptions/logs. Refresh replay revokes its entire session family; preserve this guarantee.
+- OpenAPI is the frontend contract. Regenerate and commit `backend/openapi.json` and `frontend/src/api/schema.d.ts` together.
+- Use the pinned lockfiles. Record a compatibility reason before changing a major baseline dependency.
+- For nontrivial behavior, test independent outcomes and failure/retry paths rather than merely mirroring implementation.
+- Update task statuses and `docs/verification/` with actual evidence. Missing Docker/hardware/remote checks stay unverified. Do not mark a whole phase DONE based only on compilation.
+- Use multiple agents only when the user explicitly requests them or a separately applicable instruction authorizes delegation. This file does not authorize automatic delegation.

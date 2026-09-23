@@ -2,11 +2,11 @@
 
 | 項目 | 內容 |
 |---|---|
-| 文件版本 | v0.1 |
+| 文件版本 | v0.2 |
 | 建立 / 更新日期 | 2026-09-23 |
 | 需求基準 | [01-requirements.md](01-requirements.md) v0.4 |
-| 架構基準 | [02-architecture.md](02-architecture.md) v0.1 |
-| 狀態 | 邏輯 / 實體設計基線；尚未建立資料庫或 migration；後期表按階段新增 |
+| 架構基準 | [02-architecture.md](02-architecture.md) v0.2 |
+| 狀態 | Phase 0 核心 migration 已實作；本文其餘表仍為後續設計，精確實作映射見 §14 |
 | 開發對照 | [04-dev-plan.md](04-dev-plan.md) |
 
 ## 1. 共通欄位、精度與命名
@@ -284,3 +284,21 @@ FIRE 目標依選定年支出與提款率計算；4% 僅為需求中的可調整
 5. P2 / P3 的旅行、代墊、信用卡點數、銀行同步等，在 04 有明確 backlog；啟動時新增相應 model / acceptance，不把未定欄位塞進通用 JSON 當作已實作。
 
 模型實作必須符合本文件的不變量，以及 01 的 RV-01～RV-08。任何例外需列出來源需求、影響的資料與遷移方法，並同步 02 / 04。
+
+## 14. Phase 0 已建立的實體
+
+實際 schema 以 `backend/alembic/versions/0001_phase0_phase0_foundation.py` 為準，ORM 在 `backend/app/core/models.py`，已在 PostgreSQL 16.15 驗證 migration 與 ORM 沒有差異。此節說明實作細化，未列的後期表不視為已建立。
+
+| 實體 / 調整 | 已實作內容與邊界 |
+|---|---|
+| users、book_settings、currencies | 單使用者 CLI 初始化；幣別 / 時區未設定時為 NULL。Phase 0 currencies 先保存 code/name/amount_scale；kind / display_scale 與更多幣別在 Phase 1 擴充 |
+| session_families、auth_sessions | family 擁有 owner_id、固定 expires_at、revoked_at；session 透過 family FK 決定 owner，保存 refresh_hash 與 used_at。這是正規化的 owner 關係，不在子表重複維護 owner；JWT sid/sub 必須與 family / user 一致 |
+| totp_credentials、api_tokens | TOTP 加密、啟用驗證、last_step 防重放、一次性備援碼雜湊；api_tokens 先有資料表，Bot 服務 token 的發行 / 使用到 Phase 2 才接入 |
+| login_buckets | 補充持久化限速表，key 為 HMAC，保存次數及到期時間；不保存明文登入輸入 |
+| audit_logs | Phase 0 保存 owner/action/entity/request_id/redacted_diff；以 trigger 禁止 UPDATE / DELETE。更細 actor_type / revision 欄位按後續業務加入 |
+| jobs、job_effects | Job 有唯一 logical key、lease token、到期與重試狀態；job_effects 是 probe 的唯一副作用紀錄，用於檢查重試與程序中斷恢復 |
+| outbox_events | 與請求交易同時寫入，dispatcher 以 event ID 產生唯一工作後才標 published；目前只有 Phase 0 probe 事件處理器 |
+| idempotency_records | Phase 0 支援排入 probe 的 operation/key/hash/resource_id/response_code；正式財務寫入的資源類型及回應重放於 Phase 1 擴充 |
+| backup_runs | 保存執行、完成、雜湊、錯誤及最近還原驗證時間；success / failure 等運作狀態可更新，備份內容發布後不可覆寫 |
+
+Phase 0 沒有 accounts、transactions、postings、receipts、report_snapshots 等正式財務表。備份先驗證核心使用者 / 設定 / 幣別 / TOTP 筆數與檔案雜湊；Phase 1 的 D1-08 必須新增帳本不變量與報表核對。
