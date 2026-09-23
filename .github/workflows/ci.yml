@@ -54,9 +54,13 @@ jobs:
           backend/.venv/bin/python - <<'PY'
           import os, secrets
           from cryptography.fernet import Fernet
+          jwt_secret = secrets.token_hex(32)
+          totp_key = Fernet.generate_key().decode()
+          print('::add-mask::' + jwt_secret)
+          print('::add-mask::' + totp_key)
           with open(os.environ['GITHUB_ENV'], 'a') as out:
-              out.write('JWT_SECRET=' + secrets.token_hex(32) + '\n')
-              out.write('TOTP_KEY=' + Fernet.generate_key().decode() + '\n')
+              out.write('JWT_SECRET=' + jwt_secret + '\n')
+              out.write('TOTP_KEY=' + totp_key + '\n')
           PY
       - name: Backend checks and PostgreSQL restore drill
         run: sh scripts/check-backend.sh
