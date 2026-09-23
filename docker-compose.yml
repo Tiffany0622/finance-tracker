@@ -65,12 +65,19 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
     ports: ["127.0.0.1:8080:8080"]
-    networks: [private]
+    networks: [edge, private]
     depends_on:
       api: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8080/api/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     restart: unless-stopped
     security_opt: [no-new-privileges:true]
 networks:
+  edge:
+    driver: bridge
   private:
     internal: true
 volumes:

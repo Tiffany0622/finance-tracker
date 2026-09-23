@@ -29,7 +29,7 @@ docker compose exec api python -m app.cli init-user
 - 附件：`data/app/attachments/`。Phase 0 建立儲存與備份基礎，附件上傳在 Phase 1。
 - 備份：`.env` 的 `BACKUP_HOST_DIR`。預設 `./data/backups` 僅供起步 / 演練，**不能抵抗同一磁碟損毀**。正式使用前改成另一顆磁碟或已掛載 NAS 的專用目錄，並實際做還原演練；需讓本機使用者可寫入。
 - `.env` 包含恢復 TOTP 與 session 所需的機密，請另存於加密的安全位置。一般 CSV / JSON 匯出不包含它；備份也不自動複製明文 `.env`。
-- Phase 0 Compose 網路為 internal，沒有外部整合。未來啟用 Bot、匯率或 AI 時，需依架構增加受控的對外連線設定，不能只填金鑰就當成已啟用。
+- DB、API、worker 只連接 internal 私有網路；Nginx 額外連接 edge bridge，將 Web 發佈至主機的 `127.0.0.1:8080`。目前沒有外部整合；未來啟用 Bot、匯率或 AI 時，需依架構增加受控的對外連線設定，不能只填金鑰就當成已啟用。
 - 遠端 / 手機外出存取尚未配置。選定私人連線及 HTTPS 後需同步設定 `APP_ORIGIN`、`COOKIE_SECURE=true`、代理與來源限制，再做實機驗收。
 
 ## 備份與隔離還原

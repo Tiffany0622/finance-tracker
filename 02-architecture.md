@@ -260,6 +260,6 @@ E-07 使用每日 `pg_dump` + 附件 manifest。備份期間取得全系統寫�
 
 - 實際依賴鎖定於 `backend/uv.lock`、`frontend/pnpm-lock.yaml`；原生 Python 3.12.14、Node 24.19.0、PostgreSQL 16.15 已用於驗證。
 - 容器後端以 PostgreSQL 16.15 映像搭配 uv 管理的 Python 3.12.14，確保 pg_dump / pg_restore 與 DB 同版；Node、PostgreSQL、Nginx 映像已固定 digest，平台清單含 linux/arm64。映像平台資料不等於已通過 Mac 容器執行驗收。
-- Phase 0 的 Compose 網路設 internal；未來需要外部 API 時才增加受控對外網路。開發 Vite 5173 / API 8000 僅綁 loopback；正式本機 Web 8080 經 Nginx。
+- Phase 0 的 DB / API / worker 只連 internal 私有網路；Nginx 同時連接 edge bridge 與私有網路，僅將 Web 發佈至 `127.0.0.1:8080`，並以 HTTP 健康檢查確認代理可用。未來後端需要外部 API 時才增加受控對外網路。開發 Vite 5173 / API 8000 僅綁 loopback。
 - 認證將 refresh token 歷史與撤銷狀態拆成 `auth_sessions` / `session_families`，支援輪替後舊 token 重放時撤銷整個 family。Schema 的精確映射見 03 §14。
 - 各項通過與未驗證的證據見 [Phase 0 驗證紀錄](docs/verification/phase-0.md)。本紀錄不代表 Phase 1 的帳務、圖表或附件功能已完成。

@@ -91,7 +91,14 @@ jobs:
           mkdir -p data/app/attachments data/backups
           env -u DATABASE_URL -u JWT_SECRET -u TOTP_KEY -u APP_ORIGIN -u DATA_DIR -u BACKUP_DIR \
             docker compose up -d --no-build --wait
-          curl --fail http://localhost:8080/api/health/ready
+          curl --fail http://127.0.0.1:8080/api/health/ready
+      - name: Container diagnostics on failure
+        if: failure()
+        run: |
+          if test -f .env; then
+            docker compose ps --all
+            docker compose logs --no-color --tail=80 api web
+          fi
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
