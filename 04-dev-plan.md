@@ -6,7 +6,7 @@
 | 建立 / 更新日期 | 2026-09-23 |
 | 需求基準 | [01-requirements.md](01-requirements.md) v0.4 |
 | 設計基準 | [02-architecture.md](02-architecture.md)、[03-data-model.md](03-data-model.md) v0.2 |
-| 目前狀態 | Phase 0 程式已通過原生整合 / 瀏覽器測試及遠端 Linux CI；Mac 部署驗收尚未全數完成，見 docs/verification/phase-0.md |
+| 目前狀態 | Phase 0 已通過原生整合 / 瀏覽器、遠端 Linux CI 及 Mac arm64 容器部署；常駐 / 睡眠驗收待完成，見 docs/verification/phase-0-mac.md |
 | 使用方式 | 依任務前置關係逐項實作；每次更新狀態、驗收證據與相關 commit，不以文件存在代表功能完成 |
 
 ## 1. 交付原則與範圍
@@ -46,8 +46,8 @@
 
 | 任務 | 需求 | 前置任務 | 交付與驗收 | 狀態 |
 |---|---|---|---|---|
-| D0-01 | 非功能：部署、可維護性 | — | 建 backend / frontend / scripts、README、AGENTS.md、依賴 lockfile、.env.example、.gitignore；Apple Silicon 建置冒煙測試，記錄版本與啟動命令 | VERIFY |
-| D0-02 | 非功能：資料私有、安全 | D0-01 | Compose 內網 DB、Alembic 初始 migration、健康檢查、設定分層；DB 無公開 port；owner / session / audit / job 基礎表可重建 | VERIFY |
+| D0-01 | 非功能：部署、可維護性 | — | 建 backend / frontend / scripts、README、AGENTS.md、依賴 lockfile、.env.example、.gitignore；Apple Silicon 建置冒煙測試，記錄版本與啟動命令 | DONE |
+| D0-02 | 非功能：資料私有、安全 | D0-01 | Compose 內網 DB、Alembic 初始 migration、健康檢查、設定分層；DB 無公開 port；owner / session / audit / job 基礎表可重建 | DONE |
 | D0-03 | 非功能：登入、TOTP、RWD | D0-02 | 首次 CLI 設密碼、登入 / refresh / 登出、可選 TOTP、CSRF 與 owner 檢查；Web 繁中殼與設定引導；無公開註冊及預設密碼 | DONE |
 | D0-04 | 非功能：可靠性、常駐與睡眠 | D0-02 | 持久化 job、lease、重試、冪等與 outbox；驗證執行中 kill / 重啟不丟工作、重領不重複業務效果；記錄失敗狀態 | DONE |
 | D0-05 | E-07 | D0-02, D0-04 | 一致備份 / 校驗 / 隔離還原腳本、30 天 retention、版本 manifest；先驗空殼資料，附件與實際帳本的驗收在 D1-08 | DONE |
@@ -61,7 +61,7 @@
 - D0-03：登入 / TOTP / CSRF / 撤銷 / owner 檢查、設定頁與桌面 / 觸控尺寸瀏覽器流程通過；實際 iPhone Safari 留在 RV-06 的 Phase 1 驗收。
 - D0-04：持久化佇列、冪等、outbox、同時領取、程序退出後恢復及 lease fencing 通過。
 - D0-05：Phase 0 核心資料及虛構附件完成 dump → 還原 → 核對 → 登入演練，30 天保留策略通過；正式帳本 / 真實備份磁碟仍按 D1-08 驗收。
-- D0-01 / D0-02：原生 arm64 環境與 DB 已驗證，Compose 設定及遠端 Linux x86_64 容器建置 / migration / Web 健康檢查通過；Mac 容器引擎尚不可用，因此 Mac 的 Linux arm64 容器建置 / 一鍵啟動仍為 VERIFY。
+- D0-01 / D0-02：原生 arm64、遠端 Linux x86_64 CI 與 [Mac arm64 容器實測](docs/verification/phase-0-mac.md) 均通過。Docker Desktop 4.92.0 / Engine 29.8.0 / Compose v5.5.1 完成首次建置、重複啟動、migration、Web / API / DB 健康檢查、私有入口與備份掛載驗證。
 - D0-06：Ruff、mypy、22 項 PostgreSQL 測試、migration drift、TypeScript、前端建置、生成契約及桌面 / 手機尺寸瀏覽器檢查，在 [GitHub Actions](https://github.com/Tiffany0622/finance-tracker/actions/runs/35847379622) 的乾淨 checkout 全部通過；程式提交 `675a18b`。
 - D0-07：啟動 / 等待引擎 / plist 產生腳本已交付；尚未安裝 LaunchAgent、變更主機睡眠設定或確認私人遠端方案。不能以自動化的重啟 / 過期工作測試取代實際闔蓋測試。
 

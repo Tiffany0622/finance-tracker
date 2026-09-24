@@ -10,6 +10,10 @@ parser.add_argument('--output', type=Path, default=root / 'data/com.finance-trac
 args = parser.parse_args()
 docker = shutil.which('docker')
 if not docker:
+    candidates = [Path.home() / '.docker/bin/docker',
+                  Path('/Applications/Docker.app/Contents/Resources/bin/docker')]
+    docker = next((str(path) for path in candidates if path.is_file()), None)
+if not docker:
     raise SystemExit('找不到 docker，請先安裝 Docker Desktop 或 OrbStack。')
 args.output.parent.mkdir(parents=True, exist_ok=True)
 log_dir = root / 'data/logs'

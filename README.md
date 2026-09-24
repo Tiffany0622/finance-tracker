@@ -23,6 +23,8 @@ docker compose exec api python -m app.cli init-user
 
 修改 `.env` 後以 `sh scripts/start.sh` 重新套用。要暫停服務使用 `docker compose stop`；不要使用 `down -v`，它會刪除資料庫 volume。
 
+剛安裝 Docker Desktop 時，已開啟的終端機可能尚未更新 PATH。`start.sh` 與 plist 產生器會自動尋找 `~/.docker/bin/docker` 及 Docker Desktop 內附指令，不需重新開機。其他 Docker 管理命令可先使用 `~/.docker/bin/docker` 取代 `docker`，或重新開啟終端機並確認 `docker info` 可用。
+
 ### 本機資料與外部連線
 
 - PostgreSQL：Compose 的 `db_data` volume；應用程式 DB 角色 `finance` 沒有 superuser / 建角色 / 建資料庫權限。管理員密碼只提供給 DB 容器。
