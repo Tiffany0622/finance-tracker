@@ -312,3 +312,14 @@ Phase 0 沒有 accounts、transactions、postings、receipts、report_snapshots 
 ReportSnapshot 以不可變 JSON document 保存完整 metadata／指標／明細／分類／月份／帳戶估值與引用匯率，另存 content_hash。匯出為即時渲染既有快照的授權下載，尚未建立非同步 report_exports。fx_quotes 為人工估值報價，入帳換算率則保存在 posting；歷史曲線為明示重建，尚未建立每日 net_worth_snapshots。未列模型繼續以本文為目標，不以空表代替功能。
 
 備份核對擴充到所有已建財務表：筆數、schema、分錄與分攤平衡、資料指紋和凍結報表內容。已支援舊 Phase 0 備份隔離還原，之後需升級 schema 才能啟動新版。
+
+
+### D1-04 實際 schema（0003_receipts）
+
+- `attachments`：Owned、隨機 UUID storage_key、upload_key、request_hash、原圖 sha256 / preview_sha256、mime、size_bytes、width / height、original_name、purpose=receipt、status=ready/deleting、deleted_at。`UNIQUE(owner_id, upload_key)` 永久保留重試識別；同 key 異內容 409。同圖片可合法附於不同交易，不以 hash 全域去重。staging 位於檔案系統，不建立未發布的 ready row。
+- `receipts`：Owned、transaction_id、parse_status=not_requested；本階段每筆交易一個收據組，owner + transaction 唯一。尚無辨識的金額／商家欄位不從交易複製為 OCR 結果；Phase 2 以新增 migration 擴充辨識及未入帳草稿。
+- `receipt_attachments`：owner / receipt / attachment 複合 PK、page_no > 0、receipt + page_no 唯一；多圖保留選取／上傳次序。
+- `transaction_attachments`：owner / transaction / attachment 複合 PK、role=receipt。所有跨表關聯使用 owner 複合 FK。metadata、兩種關聯與檔案發布由同一服務負責。
+- 移除時在單一 transaction 刪除該交易的兩種引用；沒有任何交易／收據引用後標 deleting。墓碑保留，實體檔案由延遲清理刪除；更正及作廢不刪引用。沒有改動 journal / posting 或報表 snapshot。
+
+驗收與尚未實機驗證的範圍見 [D1-04 驗證紀錄](docs/verification/d1-04-receipts.md)。

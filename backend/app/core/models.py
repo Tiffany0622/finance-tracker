@@ -179,6 +179,80 @@ class Owned(Identity):
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
 
 
+class Attachment(Owned, Base):
+    __tablename__ = "attachments"
+    storage_key: Mapped[uuid.UUID] = mapped_column(unique=True, default=uuid.uuid4)
+    upload_key: Mapped[str] = mapped_column(String(100))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    sha256: Mapped[str] = mapped_column(String(64))
+    preview_sha256: Mapped[str] = mapped_column(String(64))
+    mime: Mapped[str] = mapped_column(String(40))
+    size_bytes: Mapped[int] = mapped_column(BigInteger)
+    width: Mapped[int]
+    height: Mapped[int]
+    original_name: Mapped[str] = mapped_column(String(200))
+    purpose: Mapped[str] = mapped_column(default="receipt")
+    status: Mapped[str] = mapped_column(default="ready")
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        UniqueConstraint("owner_id", "id"),
+        UniqueConstraint("owner_id", "upload_key"),
+        CheckConstraint("status IN ('ready','deleting')"),
+        CheckConstraint("(status = 'deleting') = (deleted_at IS NOT NULL)"),
+        CheckConstraint("purpose = 'receipt'"),
+        CheckConstraint("mime IN ('image/jpeg','image/png','image/heic')"),
+        CheckConstraint("size_bytes > 0 AND size_bytes <= 20971520"),
+        CheckConstraint("width > 0 AND height > 0 AND width::bigint * height <= 50000000"),
+    )
+
+
+class Receipt(Owned, Base):
+    __tablename__ = "receipts"
+    transaction_id: Mapped[uuid.UUID]
+    parse_status: Mapped[str] = mapped_column(default="not_requested")
+    __table_args__ = (
+        UniqueConstraint("owner_id", "id"),
+        UniqueConstraint("owner_id", "transaction_id"),
+        ForeignKeyConstraint(
+            ["owner_id", "transaction_id"], ["transactions.owner_id", "transactions.id"]
+        ),
+        CheckConstraint("parse_status = 'not_requested'"),
+    )
+
+
+class TransactionAttachment(Base):
+    __tablename__ = "transaction_attachments"
+    owner_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    transaction_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    attachment_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    role: Mapped[str] = mapped_column(default="receipt")
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["owner_id", "transaction_id"], ["transactions.owner_id", "transactions.id"]
+        ),
+        ForeignKeyConstraint(
+            ["owner_id", "attachment_id"], ["attachments.owner_id", "attachments.id"]
+        ),
+        CheckConstraint("role = 'receipt'"),
+    )
+
+
+class ReceiptAttachment(Base):
+    __tablename__ = "receipt_attachments"
+    owner_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    receipt_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    attachment_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    page_no: Mapped[int]
+    __table_args__ = (
+        UniqueConstraint("receipt_id", "page_no"),
+        ForeignKeyConstraint(["owner_id", "receipt_id"], ["receipts.owner_id", "receipts.id"]),
+        ForeignKeyConstraint(
+            ["owner_id", "attachment_id"], ["attachments.owner_id", "attachments.id"]
+        ),
+        CheckConstraint("page_no > 0"),
+    )
+
+
 class Account(Owned, Base):
     __tablename__ = "accounts"
     name: Mapped[str]

@@ -133,9 +133,18 @@ def test_backup_restore_verifies_rows_password_and_attachments(
             refund_of_id=purchase["id"],
         ),
     )
+    from test_receipts import picture, upload
+
+    from app.core.models import Attachment, ReceiptAttachment
+    from app.receipts.service import file_path
+
+    image_bytes = picture("HEIF")
+    attached = upload(logged_in, purchase["id"], image_bytes, "image/heic", "synthetic.heic")
+    assert attached.status_code == 200
+    attachment_id = uuid.UUID(attached.json()["id"])
     saved_report = report(logged_in)
     source = settings().data_dir / "attachments"
-    source.mkdir()
+    source.mkdir(exist_ok=True)
     (source / "synthetic.txt").write_text("虛構測試收據，不含個人資料")
     backup_id = uuid.uuid4()
     path = create_backup(backup_id)
@@ -166,6 +175,11 @@ def test_backup_restore_verifies_rows_password_and_attachments(
                 "信用卡": "-20",
                 "現金": "0",
             }
+            restored_attachment = db.get(Attachment, attachment_id)
+            assert restored_attachment and restored_attachment.original_name == "synthetic.heic"
+            original = file_path(restored_attachment.storage_key, "original", tmp_path / "restored")
+            assert original.read_bytes() == image_bytes
+            assert db.scalar(select(func.count()).select_from(ReceiptAttachment)) == 1
             restored_report = db.get(ReportSnapshot, uuid.UUID(saved_report["id"]))
             assert restored_report and restored_report.document == saved_report["document"]
         check_login = """

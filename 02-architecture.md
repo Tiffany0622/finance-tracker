@@ -268,4 +268,15 @@ E-07 使用每日 `pg_dump` + 附件 manifest。備份期間取得全系統寫�
 
 `app/ledger` 先集中帳戶、分錄服務、查詢、報表與 CSV。所有業務寫入先取得維護共享鎖，再鎖 owner 的 book_settings；報表使用相同 owner 鎖凍結資料，CSV 僅讀已保存快照。ECharts 6.0.0 使用模組化匯入及 SVG renderer，遵循[官方匯入方式](https://echarts.apache.org/handbook/en/basics/import/)。金額仍由後端 Decimal 計算；圖形座標才轉前端數值。
 
-本版 merchant 為交易文字、tags 為受限字串清單，沒有宣稱正規化商家／標籤庫完成；後續保留原字串遷移至實體與連接表。人工估值匯率與歷史入帳匯率分開保存。淨資產曲線從有效帳本重建並標示狀態，每日封存、自動 provider、附件／週期／全量匯出仍維持 04 的未完成清單。
+本版 merchant 為交易文字、tags 為受限字串清單，沒有宣稱正規化商家／標籤庫完成；後續保留原字串遷移至實體與連接表。人工估值匯率與歷史入帳匯率分開保存。淨資產曲線從有效帳本重建並標示狀態，每日封存、自動 provider、週期／全量匯出仍維持 04 的未完成清單。
+
+
+### D1-04 附件實作（2026-09-24）
+
+`receipts` 模組提供 `/transactions/{id}/attachments` 的 GET / POST、`/transactions/{id}/attachments/{attachment_id}` 的 DELETE，以及 `/attachments/{id}/preview|original`。每次上傳為受限 raw binary body + filename query + Idempotency-Key，前端按序送出多圖並獨立保留失敗項目。cookie 寫入沿用 CSRF / exact Origin，全部讀寫核對 owner，沒有公開檔案 URL。Nginx 僅附件路徑放寬至 20 MiB；其他路徑保留 1 MiB。
+
+Pillow 12.3.0 / pillow-heif 1.8.0 鎖定版本；完整解碼後才接受 JPEG / PNG / HEIC，限制 5,000 萬像素與單影格。PNG 透明背景轉白、依 EXIF 旋轉，再由全新 image 產生最長邊 1600px JPEG 預覽，不帶原 EXIF / GPS / XMP。原始位元組保持不變；只能以 attachment 下載，名稱使用已驗證圖片類型的副檔名。預覽經登入 API 取 blob，由受限 `img-src blob:` 顯示。
+
+所有檔案寫入／清理持有共用備份維護鎖與獨立附件 advisory lock；附件業務寫入再鎖 owner book row。先將兩個檔案以 0600 寫入 UUID staging 目錄、fsync，再原子 rename 至 objects，最後同一 DB transaction 提交 metadata、收據頁序及交易關聯。中途中斷最多留下未引用檔，不出現 DB ready 指向尚未發布的檔案；回覆遺失以同 key 重試取得同一附件。Worker 每 5 分鐘掃描，只清理至少 24 小時的 UUID 孤兒／staging，或確定無引用的 deleting 檔案，拒絕符號連結。ready 檔案缺失或雜湊不符必須報錯。
+
+備份在獨占維護鎖內驗證 DB 引用及原圖／預覽 SHA-256，僅複製 active objects，記錄四張附件／收據表的 metadata 指紋；隔離還原再核對。0001 / 0002 舊備份仍可隔離還原，但須升級 schema 後啟用新版服務。參考：[Pillow Image](https://pillow.readthedocs.io/en/stable/reference/Image.html)、[pillow-heif plugin](https://pillow-heif.readthedocs.io/en/latest/pillow-plugin.html)；本版本以本機與容器實測為準。

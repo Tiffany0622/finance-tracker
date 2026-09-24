@@ -64,6 +64,7 @@ from app.core.security import (
     revoke_others,
 )
 from app.ledger.routes import router as ledger_router
+from app.receipts.routes import router as receipts_router
 
 
 @asynccontextmanager
@@ -76,7 +77,7 @@ app = FastAPI(
     lifespan=lifespan,
     responses={code: {"model": ErrorOutput} for code in (400, 401, 403, 404, 409, 422, 429, 503)},
     title="Finance Tracker",
-    version="0.2.0",
+    version="0.3.0",
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
@@ -84,6 +85,7 @@ app = FastAPI(
 PREFIX = "/api/v1"
 
 app.include_router(ledger_router)
+app.include_router(receipts_router)
 
 
 @app.middleware("http")

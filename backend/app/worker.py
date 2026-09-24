@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.core.db import SCHEDULER_LOCK, check_schema, transaction
 from app.core.jobs import apply_probe, claim, dispatch_outbox, enqueue, finish, heartbeat
 from app.core.models import BackupRun, User, now
+from app.receipts.service import collect_garbage
 
 log = logging.getLogger("finance.worker")
 stop = threading.Event()
@@ -78,6 +79,7 @@ def main() -> None:
     for signum in (signal.SIGTERM, signal.SIGINT):
         signal.signal(signum, lambda *_: stop.set())
     scheduler = BackgroundScheduler(timezone="UTC")
+    scheduler.add_job(collect_garbage, "interval", minutes=5, coalesce=True, max_instances=1)
     scheduler.add_job(
         schedule_backup,
         "interval",

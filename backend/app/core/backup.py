@@ -18,6 +18,8 @@ from app.core.config import settings
 from app.core.db import MAINTENANCE_LOCK, SCHEMA_VERSION, engine, transaction
 from app.core.models import BackupRun, now
 
+ATTACHMENT_TABLES = ("attachments", "receipts", "transaction_attachments", "receipt_attachments")
+
 BACKUP_TABLES = (
     "users",
     "book_settings",
@@ -32,7 +34,52 @@ BACKUP_TABLES = (
     "transaction_splits",
     "fx_quotes",
     "report_snapshots",
-)
+) + ATTACHMENT_TABLES
+
+
+def attachment_fingerprint(conn: Any, data_dir: Path) -> str:
+    from app.receipts.service import file_path
+
+    conn.execute(text("SET LOCAL timezone TO 'UTC'"))
+    digest = hashlib.sha256()
+    for table in ATTACHMENT_TABLES:
+        for row in conn.execute(
+            text(f'SELECT row_to_json(t)::text FROM "{table}" t ORDER BY row_to_json(t)::text')
+        ):
+            digest.update(row[0].encode())
+            digest.update(b"\n")
+    if conn.scalar(
+        text("""
+        SELECT count(*) FROM attachments a WHERE
+        (a.status = 'ready' AND (
+            NOT EXISTS (SELECT 1 FROM transaction_attachments t WHERE t.attachment_id=a.id) OR
+            NOT EXISTS (SELECT 1 FROM receipt_attachments r WHERE r.attachment_id=a.id))) OR
+        (a.status = 'deleting' AND (
+            EXISTS (SELECT 1 FROM transaction_attachments t WHERE t.attachment_id=a.id) OR
+            EXISTS (SELECT 1 FROM receipt_attachments r WHERE r.attachment_id=a.id)))
+    """)
+    ):
+        raise ValueError("attachment_reference_invalid")
+    if conn.scalar(
+        text("""
+        SELECT count(*) FROM receipt_attachments p JOIN receipts r ON r.id=p.receipt_id
+        WHERE NOT EXISTS (SELECT 1 FROM transaction_attachments t
+          WHERE t.owner_id=p.owner_id AND t.attachment_id=p.attachment_id AND t.transaction_id=r.transaction_id)
+    """)
+    ):
+        raise ValueError("receipt_reference_invalid")
+    for row in conn.execute(
+        text(
+            "SELECT storage_key,sha256,preview_sha256,size_bytes FROM attachments WHERE status='ready'"
+        )
+    ):
+        for name, expected in (("original", row.sha256), ("preview.jpg", row.preview_sha256)):
+            path = file_path(row.storage_key, name, data_dir)
+            if not path.is_file() or sha256(path) != expected:
+                raise ValueError("attachment_file_missing_or_changed")
+            if name == "original" and path.stat().st_size != row.size_bytes:
+                raise ValueError("attachment_size_changed")
+    return digest.hexdigest()
 
 
 def financial_fingerprint(conn: Any) -> str:
@@ -98,6 +145,7 @@ def verify_backup(path: Path) -> dict[str, Any]:
     manifest = json.loads((path / "manifest.json").read_text())
     if manifest.get("format_version") != 1 or manifest.get("schema_version") not in (
         "0001_phase0",
+        "0002_ledger",
         SCHEMA_VERSION,
     ):
         raise ValueError("backup_version_unsupported")
@@ -191,8 +239,27 @@ def _create_backup(backup_id: uuid.UUID) -> Path:
                             or attachments.is_symlink()
                         ):
                             raise ValueError("attachment_symlink_rejected")
-                        shutil.copytree(attachments, staging / "attachments")
+                        # Keep legacy Phase 0 files; staging/deleted/orphan objects are not backups.
+                        shutil.copytree(
+                            attachments,
+                            staging / "attachments",
+                            ignore=lambda p, names: (
+                                set(names) & {"objects", "staging"}
+                                if Path(p) == attachments
+                                else set()
+                            ),
+                        )
                     with Session(engine()) as db:
+                        attachment_hash = attachment_fingerprint(db, cfg.data_dir)
+                        for key in db.scalars(
+                            text("SELECT storage_key FROM attachments WHERE status='ready'")
+                        ):
+                            shutil.copytree(
+                                attachments / "objects" / str(key),
+                                staging / "attachments" / "objects" / str(key),
+                            )
+                        if attachment_fingerprint(db, staging) != attachment_hash:
+                            raise ValueError("backup_attachment_copy_mismatch")
                         counts = {
                             name: db.scalar(text(f'SELECT count(*) FROM "{name}"'))
                             for name in BACKUP_TABLES
@@ -213,6 +280,7 @@ def _create_backup(backup_id: uuid.UUID) -> Path:
                         "created_at": now().isoformat(),
                         "counts": counts,
                         "financial_hash": financial_hash,
+                        "attachment_hash": attachment_hash,
                         "files": files,
                         "secrets": "Keep JWT_SECRET and TOTP_KEY separately; not included as plaintext.",
                     }
@@ -314,10 +382,15 @@ def restore_backup(source: Path, target_url: str, target_data: Path) -> None:
                     raise ValueError("backup_count_table_invalid")
                 if conn.scalar(text(f'SELECT count(*) FROM "{name}"')) != expected:
                     raise ValueError("restored_count_mismatch")
-            if manifest["schema_version"] == SCHEMA_VERSION and financial_fingerprint(
-                conn
-            ) != manifest.get("financial_hash"):
+            if manifest["schema_version"] in (
+                "0002_ledger",
+                SCHEMA_VERSION,
+            ) and financial_fingerprint(conn) != manifest.get("financial_hash"):
                 raise ValueError("restored_financial_mismatch")
+            if manifest["schema_version"] == SCHEMA_VERSION and attachment_fingerprint(
+                conn, target_data
+            ) != manifest.get("attachment_hash"):
+                raise ValueError("restored_attachment_metadata_mismatch")
         for name, expected in manifest["files"].items():
             if name.startswith("attachments/") and sha256(target_data / name) != expected:
                 raise ValueError("restored_attachment_mismatch")

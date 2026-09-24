@@ -9,7 +9,7 @@ from app.core.config import settings
 
 MAINTENANCE_LOCK = 724801
 SCHEDULER_LOCK = 724802
-SCHEMA_VERSION = "0002_ledger"
+SCHEMA_VERSION = "0003_receipts"
 
 
 @lru_cache

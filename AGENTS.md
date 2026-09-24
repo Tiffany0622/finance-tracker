@@ -4,7 +4,7 @@ Read `01-requirements.md`, `02-architecture.md`, `03-data-model.md`, `04-dev-pla
 
 ## Scope and data
 
-- Current implementation is Phase 1's first manual-ledger delivery (bank/cash/credit card, income/expense/refund/transfer, charts and CSV). Remaining Phase 1 tasks stay open in 04-dev-plan.md. Do not show unfinished financial metrics as zero or mark future requirements complete.
+- Current implementation is Phase 1's manual-ledger delivery (bank/cash/credit card, income/expense/refund/transfer, charts and CSV) plus D1-04 receipt attachments. Remaining Phase 1 tasks stay open in 04-dev-plan.md. Do not show unfinished financial metrics as zero or mark future requirements complete.
 - PostgreSQL is authoritative. Use real PostgreSQL integration tests, Decimal for financial values, migrations for schema changes, and backend-generated report snapshots in later phases.
 - Never commit `.env`, production data, attachments, backups, logs, local runtime downloads or browser sessions. Test fixtures must be synthetic.
 - Do not overwrite user changes or a real DB to make tests pass. `TEST_DATABASE_URL` must name a disposable `finance_test*` database. Tests truncate its app tables and create temporary `finance_restore_*` databases.
@@ -54,3 +54,5 @@ Compose startup: `python3 scripts/configure.py`, `sh scripts/start.sh`, then int
 - For nontrivial behavior, test independent outcomes and failure/retry paths rather than merely mirroring implementation.
 - Update task statuses and `docs/verification/` with actual evidence. Missing Docker/hardware/remote checks stay unverified. Do not mark a whole phase DONE based only on compilation.
 - Use multiple agents only when the user explicitly requests them or a separately applicable instruction authorizes delegation. This file does not authorize automatic delegation.
+
+- Receipt files must use the receipts service, backup maintenance lock and attachment advisory lock. Keep original bytes private and immutable; publish files before metadata commit. Cleanup must check all references and the 24-hour grace period. Never put production receipts in Git; the tiny receipt fixtures are explicitly synthetic.
