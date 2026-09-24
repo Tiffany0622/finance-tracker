@@ -19,7 +19,11 @@ x-app: &app
   security_opt: [no-new-privileges:true]
   volumes:
     - ./data/app:/data
-    - ${BACKUP_HOST_DIR:-./data/backups}:/backups
+    - type: bind
+      source: ${BACKUP_HOST_DIR:-./data/backups}
+      target: /backups
+      bind:
+        create_host_path: false
 services:
   db:
     image: postgres:16.15-bookworm@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67

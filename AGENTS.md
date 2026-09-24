@@ -4,7 +4,7 @@ Read `01-requirements.md`, `02-architecture.md`, `03-data-model.md`, `04-dev-pla
 
 ## Scope and data
 
-- Current implementation is Phase 0. Do not show unfinished financial metrics as zero or mark future requirements complete.
+- Current implementation is Phase 1's first manual-ledger delivery (bank/cash/credit card, income/expense/refund/transfer, charts and CSV). Remaining Phase 1 tasks stay open in 04-dev-plan.md. Do not show unfinished financial metrics as zero or mark future requirements complete.
 - PostgreSQL is authoritative. Use real PostgreSQL integration tests, Decimal for financial values, migrations for schema changes, and backend-generated report snapshots in later phases.
 - Never commit `.env`, production data, attachments, backups, logs, local runtime downloads or browser sessions. Test fixtures must be synthetic.
 - Do not overwrite user changes or a real DB to make tests pass. `TEST_DATABASE_URL` must name a disposable `finance_test*` database. Tests truncate its app tables and create temporary `finance_restore_*` databases.
@@ -49,6 +49,8 @@ Compose startup: `python3 scripts/configure.py`, `sh scripts/start.sh`, then int
 - Cookie mutations require CSRF and exact Origin. Don't expose tokens or secrets in exceptions/logs. Refresh replay revokes its entire session family; preserve this guarantee.
 - OpenAPI is the frontend contract. Regenerate and commit `backend/openapi.json` and `frontend/src/api/schema.d.ts` together.
 - Use the pinned lockfiles. Record a compatibility reason before changing a major baseline dependency.
+- Financial and valuation/category/account writers lock the owner's BookSettings row. Report creation takes the same lock and freezes displayed rows and totals. Exports read only that immutable snapshot.
+- Never run Alembic downgrade against a real ledger. Corrections use reversal/replacement; migration rollback is only for disposable tests or a planned restore.
 - For nontrivial behavior, test independent outcomes and failure/retry paths rather than merely mirroring implementation.
 - Update task statuses and `docs/verification/` with actual evidence. Missing Docker/hardware/remote checks stay unverified. Do not mark a whole phase DONE based only on compilation.
 - Use multiple agents only when the user explicitly requests them or a separately applicable instruction authorizes delegation. This file does not authorize automatic delegation.

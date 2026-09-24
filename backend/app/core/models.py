@@ -1,15 +1,20 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
+    Numeric,
     String,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -168,3 +173,171 @@ class BackupRun(Identity, Base):
     manifest_hash: Mapped[str | None]
     error_code: Mapped[str | None]
     last_restore_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Owned(Identity):
+    owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+
+
+class Account(Owned, Base):
+    __tablename__ = "accounts"
+    name: Mapped[str]
+    kind: Mapped[str]
+    currency: Mapped[str] = mapped_column(ForeignKey("currencies.code"))
+    include_in_net_worth: Mapped[bool] = mapped_column(default=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revision: Mapped[int] = mapped_column(default=1)
+    __table_args__ = (
+        UniqueConstraint("owner_id", "id"),
+        CheckConstraint("kind IN ('bank','cash','credit_card')"),
+        CheckConstraint("revision > 0"),
+    )
+
+
+class Category(Owned, Base):
+    __tablename__ = "categories"
+    name: Mapped[str]
+    kind: Mapped[str]
+    parent_id: Mapped[uuid.UUID | None]
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revision: Mapped[int] = mapped_column(default=1)
+    __table_args__ = (
+        UniqueConstraint("owner_id", "id"),
+        ForeignKeyConstraint(["owner_id", "parent_id"], ["categories.owner_id", "categories.id"]),
+        CheckConstraint("kind IN ('income','expense')"),
+    )
+
+
+class LedgerAccount(Owned, Base):
+    __tablename__ = "ledger_accounts"
+    account_id: Mapped[uuid.UUID | None]
+    code: Mapped[str]
+    ledger_class: Mapped[str]
+    currency: Mapped[str] = mapped_column(ForeignKey("currencies.code"))
+    __table_args__ = (
+        UniqueConstraint("owner_id", "id"),
+        UniqueConstraint("owner_id", "code"),
+        UniqueConstraint("account_id"),
+        ForeignKeyConstraint(["owner_id", "account_id"], ["accounts.owner_id", "accounts.id"]),
+        CheckConstraint("ledger_class IN ('asset','liability','income','expense','equity')"),
+    )
+
+
+class Transaction(Owned, Base):
+    __tablename__ = "transactions"
+    kind: Mapped[str]
+    status: Mapped[str] = mapped_column(default="posted")
+    current_entry_id: Mapped[uuid.UUID | None]
+    refund_of_id: Mapped[uuid.UUID | None]
+    revision: Mapped[int] = mapped_column(default=1)
+    note: Mapped[str] = mapped_column(default="")
+    merchant: Mapped[str] = mapped_column(default="")
+    tags: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    __table_args__ = (
+        UniqueConstraint("owner_id", "id"),
+        ForeignKeyConstraint(
+            ["owner_id", "refund_of_id"], ["transactions.owner_id", "transactions.id"]
+        ),
+        ForeignKeyConstraint(
+            ["owner_id", "id", "current_entry_id"],
+            ["journal_entries.owner_id", "journal_entries.transaction_id", "journal_entries.id"],
+            name="fk_transaction_current_entry",
+            use_alter=True,
+        ),
+        CheckConstraint("kind IN ('income','expense','transfer','refund','opening','adjustment')"),
+        CheckConstraint("status IN ('posted','voided')"),
+        CheckConstraint("revision > 0"),
+    )
+
+
+class JournalEntry(Owned, Base):
+    __tablename__ = "journal_entries"
+    transaction_id: Mapped[uuid.UUID]
+    revision_no: Mapped[int]
+    entry_role: Mapped[str]
+    occurred_on: Mapped[date] = mapped_column(Date)
+    book_currency: Mapped[str] = mapped_column(ForeignKey("currencies.code"))
+    reverses_entry_id: Mapped[uuid.UUID | None]
+    reason: Mapped[str] = mapped_column(default="")
+    creation_txid: Mapped[int] = mapped_column(BigInteger, server_default=text("txid_current()"))
+    __table_args__ = (
+        UniqueConstraint("owner_id", "id"),
+        UniqueConstraint("owner_id", "transaction_id", "id"),
+        UniqueConstraint("transaction_id", "revision_no", "entry_role"),
+        UniqueConstraint("reverses_entry_id"),
+        ForeignKeyConstraint(
+            ["owner_id", "transaction_id"], ["transactions.owner_id", "transactions.id"]
+        ),
+        ForeignKeyConstraint(
+            ["owner_id", "reverses_entry_id"], ["journal_entries.owner_id", "journal_entries.id"]
+        ),
+        CheckConstraint("entry_role IN ('original','reversal','replacement')"),
+        Index("ix_entries_owner_date", "owner_id", "occurred_on"),
+    )
+
+
+class Posting(Owned, Base):
+    __tablename__ = "postings"
+    entry_id: Mapped[uuid.UUID]
+    line_no: Mapped[int]
+    ledger_account_id: Mapped[uuid.UUID]
+    currency: Mapped[str] = mapped_column(ForeignKey("currencies.code"))
+    amount_signed: Mapped[Decimal] = mapped_column(Numeric(38, 18))
+    book_amount_signed: Mapped[Decimal] = mapped_column(Numeric(38, 18))
+    fx_rate: Mapped[Decimal] = mapped_column(Numeric(38, 18))
+    component: Mapped[str]
+    __table_args__ = (
+        UniqueConstraint("owner_id", "id"),
+        UniqueConstraint("owner_id", "entry_id", "id"),
+        UniqueConstraint("entry_id", "line_no"),
+        ForeignKeyConstraint(
+            ["owner_id", "entry_id"], ["journal_entries.owner_id", "journal_entries.id"]
+        ),
+        ForeignKeyConstraint(
+            ["owner_id", "ledger_account_id"], ["ledger_accounts.owner_id", "ledger_accounts.id"]
+        ),
+        CheckConstraint(
+            "amount_signed <> 0 AND abs(amount_signed) < 1e18 AND abs(book_amount_signed) < 1e18 AND fx_rate > 0 AND fx_rate < 1e18"
+        ),
+        Index("ix_postings_ledger", "ledger_account_id"),
+    )
+
+
+class TransactionSplit(Owned, Base):
+    __tablename__ = "transaction_splits"
+    entry_id: Mapped[uuid.UUID]
+    posting_id: Mapped[uuid.UUID]
+    category_id: Mapped[uuid.UUID]
+    amount_signed: Mapped[Decimal] = mapped_column(Numeric(38, 18))
+    book_amount_signed: Mapped[Decimal] = mapped_column(Numeric(38, 18))
+    __table_args__ = (
+        UniqueConstraint("owner_id", "id"),
+        ForeignKeyConstraint(
+            ["owner_id", "entry_id", "posting_id"],
+            ["postings.owner_id", "postings.entry_id", "postings.id"],
+        ),
+        ForeignKeyConstraint(["owner_id", "category_id"], ["categories.owner_id", "categories.id"]),
+        CheckConstraint(
+            "amount_signed <> 0 AND abs(amount_signed) < 1e18 AND abs(book_amount_signed) < 1e18"
+        ),
+    )
+
+
+class FxQuote(Owned, Base):
+    __tablename__ = "fx_quotes"
+    currency: Mapped[str] = mapped_column(ForeignKey("currencies.code"))
+    book_currency: Mapped[str] = mapped_column(ForeignKey("currencies.code"))
+    effective_on: Mapped[date] = mapped_column(Date)
+    rate: Mapped[Decimal] = mapped_column(Numeric(38, 18))
+    source: Mapped[str]
+    __table_args__ = (
+        CheckConstraint("rate > 0 AND rate < 1e18"),
+        Index("ix_quotes_owner_currency_date", "owner_id", "currency", "effective_on"),
+    )
+
+
+class ReportSnapshot(Owned, Base):
+    __tablename__ = "report_snapshots"
+    document: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    content_hash: Mapped[str]
+    __table_args__ = (UniqueConstraint("owner_id", "id"),)

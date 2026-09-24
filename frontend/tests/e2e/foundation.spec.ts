@@ -12,7 +12,7 @@ test('login, configure, run a durable job, logout and log in again', async ({pag
   await page.getByLabel('帳務時區').fill('America/Los_Angeles');
   await page.getByRole('button', {name:'儲存設定'}).click();
   await expect(page.getByText('設定已儲存。')).toBeVisible();
-  await page.getByRole('button', {name:'總覽',exact:true}).click();
+  await page.getByRole('button', {name:'系統狀態',exact:true}).click();
   await page.getByRole('button', {name:'執行檢查'}).click();
   await expect(page.getByText('背景工作正常')).toBeVisible({timeout:15000});
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth);

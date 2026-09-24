@@ -1,4 +1,4 @@
-name: Phase 0 checks
+name: Finance tracker checks
 on:
   push:
     branches: [main, 'codex/**']

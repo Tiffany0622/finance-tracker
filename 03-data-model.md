@@ -6,7 +6,7 @@
 | 建立 / 更新日期 | 2026-09-23 |
 | 需求基準 | [01-requirements.md](01-requirements.md) v0.4 |
 | 架構基準 | [02-architecture.md](02-architecture.md) v0.2 |
-| 狀態 | Phase 0 核心 migration 已實作；本文其餘表仍為後續設計，精確實作映射見 §14 |
+| 狀態 | Phase 0 及 Phase 1 首批 migration 已實作；精確映射與未完成模型見 §14、§15 |
 | 開發對照 | [04-dev-plan.md](04-dev-plan.md) |
 
 ## 1. 共通欄位、精度與命名
@@ -302,3 +302,13 @@ FIRE 目標依選定年支出與提款率計算；4% 僅為需求中的可調整
 | backup_runs | 保存執行、完成、雜湊、錯誤及最近還原驗證時間；success / failure 等運作狀態可更新，備份內容發布後不可覆寫 |
 
 Phase 0 沒有 accounts、transactions、postings、receipts、report_snapshots 等正式財務表。備份先驗證核心使用者 / 設定 / 幣別 / TOTP 筆數與檔案雜湊；Phase 1 的 D1-08 必須新增帳本不變量與報表核對。
+
+## 15. Phase 1 首批已建立的實體
+
+靜態 migration `0002_ledger` 新增 accounts、categories、ledger_accounts、transactions、journal_entries、postings、transaction_splits、fx_quotes、report_snapshots。帳戶目前只開放 bank/cash/credit_card；財務欄位使用 NUMERIC(38,18)，API 金額字串且按幣別拒絕超精度。合計、同 owner FK、分錄／分攤平衡及不可變規則由 DB 約束；以 transaction ID 與 PostgreSQL xmin 防止對既有分錄追加行。
+
+`transactions.merchant` 與 `tags` 暫保存手動文字／受限清單，商家、標籤專表仍待遷移。退款指向原支出、保存自己的不可變分類分攤；服務鎖定 owner 帳本並依剩餘分類金額分配退款。原支出有有效退款時拒絕更正／作廢；同幣退款可用，跨幣 refund_allocations 專表仍待後續實作，不宣稱 §3.3 全部完成。
+
+ReportSnapshot 以不可變 JSON document 保存完整 metadata／指標／明細／分類／月份／帳戶估值與引用匯率，另存 content_hash。匯出為即時渲染既有快照的授權下載，尚未建立非同步 report_exports。fx_quotes 為人工估值報價，入帳換算率則保存在 posting；歷史曲線為明示重建，尚未建立每日 net_worth_snapshots。未列模型繼續以本文為目標，不以空表代替功能。
+
+備份核對擴充到所有已建財務表：筆數、schema、分錄與分攤平衡、資料指紋和凍結報表內容。已支援舊 Phase 0 備份隔離還原，之後需升級 schema 才能啟動新版。

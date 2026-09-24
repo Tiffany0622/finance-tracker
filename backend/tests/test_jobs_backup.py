@@ -101,7 +101,39 @@ def test_missed_schedule_is_enqueued_once() -> None:
         assert db.scalar(select(func.count()).select_from(Job).where(Job.kind == "backup")) == 1
 
 
-def test_backup_restore_verifies_rows_password_and_attachments(tmp_path: Path) -> None:
+def test_backup_restore_verifies_rows_password_and_attachments(
+    tmp_path: Path, logged_in: TestClient
+) -> None:
+    from test_ledger import expense, post, report, setup
+
+    from app.core.models import ReportSnapshot
+    from app.ledger.service import balance_accounts
+
+    bank, card, _, food, _, _ = setup(logged_in)
+    purchase = post(logged_in, "/transactions", expense(card, food))
+    post(
+        logged_in,
+        "/transactions",
+        dict(
+            kind="transfer",
+            occurred_on="2026-01-06",
+            account_id=bank["id"],
+            to_account_id=card["id"],
+            amount="100",
+        ),
+    )
+    post(
+        logged_in,
+        "/transactions",
+        dict(
+            kind="refund",
+            occurred_on="2026-01-07",
+            account_id=card["id"],
+            amount="20",
+            refund_of_id=purchase["id"],
+        ),
+    )
+    saved_report = report(logged_in)
     source = settings().data_dir / "attachments"
     source.mkdir()
     (source / "synthetic.txt").write_text("虛構測試收據，不含個人資料")
@@ -129,6 +161,13 @@ def test_backup_restore_verifies_rows_password_and_attachments(tmp_path: Path) -
             user = db.scalar(select(User))
             assert user and user.login_name == "alice"
             assert password_ok(user.password_hash, PASSWORD)
+            assert {a.name: a.balance for a in balance_accounts(db, user.id)} == {
+                "銀行": "900",
+                "信用卡": "-20",
+                "現金": "0",
+            }
+            restored_report = db.get(ReportSnapshot, uuid.UUID(saved_report["id"]))
+            assert restored_report and restored_report.document == saved_report["document"]
         check_login = """
 from fastapi.testclient import TestClient
 from app.main import app

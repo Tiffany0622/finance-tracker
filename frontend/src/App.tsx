@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { ArrowRight, Check, ChevronRight, Database, FileClock, LayoutDashboard, Leaf, LockKeyhole, LogOut, RefreshCw, Settings2, ShieldCheck, Wallet } from 'lucide-react';
 import { api, ApiError, prepareCsrf } from './api/client';
 import type { components } from './api/schema';
+import { FinanceWorkspace } from './FinanceWorkspace';
 import { Button } from './components/ui/button';
 type User = components['schemas']['UserOutput'];
 type Status = components['schemas']['StatusOutput'];
@@ -39,25 +40,29 @@ export function App() {
       <p className="nav-label">工作空間</p>
       <nav aria-label="主要導覽">
         <button aria-current={tab === 'overview' ? 'page' : undefined} onClick={() => setTab('overview')}><LayoutDashboard size={19}/>總覽</button>
+        <button aria-current={tab === 'accounts' ? 'page' : undefined} onClick={() => setTab('accounts')}><Wallet size={19}/>帳戶</button>
+        <button aria-current={tab === 'transactions' ? 'page' : undefined} onClick={() => setTab('transactions')}><FileClock size={19}/>記帳</button>
+        <button aria-current={tab === 'system' ? 'page' : undefined} onClick={() => setTab('system')}><Database size={19}/>系統狀態</button>
         <button aria-current={tab === 'settings' ? 'page' : undefined} onClick={() => setTab('settings')}><Settings2 size={19}/>偏好設定</button>
         <button aria-current={tab === 'security' ? 'page' : undefined} onClick={() => setTab('security')}><ShieldCheck size={19}/>帳號安全</button>
       </nav>
       <div className="sidebar-bottom"><span className="local-dot"/>帳本保存在這台電腦<p>自己的資料，自己掌握。</p></div>
     </aside>
     <div className="main-shell">
-      <header className="topbar"><span><span className="muted">我的空間</span><ChevronRight size={14}/>{tab === 'overview' ? '總覽' : tab === 'settings' ? '偏好設定' : '帳號安全'}</span><button onClick={logout} className="logout"><LogOut size={16}/>登出</button></header>
+      <header className="topbar"><span><span className="muted">我的空間</span><ChevronRight size={14}/>{{overview:'總覽',accounts:'帳戶',transactions:'記帳',system:'系統狀態',settings:'偏好設定',security:'帳號安全'}[tab]}</span><button onClick={logout} className="logout"><LogOut size={16}/>登出</button></header>
       <main className="content">
         {error && <div className="alert" role="alert">{error}<button onClick={load}>重新連線</button></div>}
-        {tab === 'overview' && <>
+        {['overview','accounts','transactions'].includes(tab) && user.settings.setup_completed && <FinanceWorkspace tab={tab} currency={user.settings.book_currency!} timezone={user.settings.timezone!}/>}
+        {(['overview','accounts','transactions'].includes(tab) && !user.settings.setup_completed || tab === 'system') && <>
           <div className="page-heading"><div><p className="eyebrow">A CLEARER PICTURE</p><h1>從容整理，每一筆生活。</h1><p>歡迎回來，{user.username}。先把您的財務空間準備好。</p></div><span className="phase-tag">基礎環境已建立</span></div>
-          <section className="welcome-card"><div><span className="small-label">開始之前</span><h2>{user.settings.setup_completed ? '您的帳本偏好已就緒' : '讓這裡，成為您的帳本'}</h2><p>{user.settings.setup_completed ? '幣別與時區已儲存。帳戶、收支與圖表將在下一階段加入。' : '選擇常用幣別與帳務時區，讓之後的記帳與報表使用相同標準。'}</p><Button onClick={() => setTab('settings')}>{user.settings.setup_completed ? '查看偏好設定' : '完成首次設定'}<ArrowRight size={16}/></Button></div><div className="welcome-art" aria-hidden="true"><div className="art-disc"><Wallet size={66} strokeWidth={1}/></div><span className="art-chip"><Check size={14}/>本機保存</span></div></section>
+          <section className="welcome-card"><div><span className="small-label">開始之前</span><h2>{user.settings.setup_completed ? '您的帳本偏好已就緒' : '讓這裡，成為您的帳本'}</h2><p>{user.settings.setup_completed ? '幣別與時區已儲存。可從帳戶頁建立銀行、現金與信用卡帳戶，再開始記帳。' : '選擇常用幣別與帳務時區，讓之後的記帳與報表使用相同標準。'}</p><Button onClick={() => setTab('settings')}>{user.settings.setup_completed ? '查看偏好設定' : '完成首次設定'}<ArrowRight size={16}/></Button></div><div className="welcome-art" aria-hidden="true"><div className="art-disc"><Wallet size={66} strokeWidth={1}/></div><span className="art-chip"><Check size={14}/>本機保存</span></div></section>
           <div className="section-heading"><h2>空間狀態</h2><span>{updated && `上次確認 ${updated}`}{error && ' · 資料可能已過期'}</span></div>
           <div className="status-grid">
             <StatusCard icon={<Database/>} label="資料庫" value={status?.database === 'ready' ? '連線正常' : '尚未確認'} detail="正式資料保存在本機 PostgreSQL"/>
             <StatusCard icon={<FileClock/>} label="最近備份" value={status?.backup_last_success ? new Date(status.backup_last_success).toLocaleString('zh-TW') : '尚無成功備份'} detail={status?.backup_last_error ? '最近備份失敗，請檢查目的地' : status?.backup_overdue ? '備份尚未完成或已超過 26 小時' : '已寫入設定的目的地；外接磁碟須另行確認'}/>
             <StatusCard icon={<ShieldCheck/>} label="登入保護" value={user.totp_enabled ? '雙重驗證已開啟' : '密碼保護'} detail={user.totp_enabled ? '登入時需要密碼與驗證碼' : '可在帳號安全加上第二道保護'}/>
           </div>
-          <div className="lower-grid"><section className="panel"><div className="section-heading"><h2>接下來的功能</h2><span>尚未啟用</span></div>{[['01','帳戶與日常記帳','整理帳戶、收支與轉帳'],['02','收支圖表與報表','看懂趨勢，匯出留存'],['03','Telegram 快速記帳','收據與文字，隨手記錄']].map(([number,title,desc]) => <div className="roadmap" key={number}><span>{number}</span><div><h3>{title}</h3><p>{desc}</p></div><LockKeyhole size={15}/></div>)}</section>
+          <div className="lower-grid"><section className="panel"><div className="section-heading"><h2>接下來的功能</h2><span>尚未啟用</span></div>{[['01','自動收據與週期記帳','後續 Phase 1 工作'],['02','Numbers XLSX 與 PDF','Phase 1.5 報表檔案'],['03','Telegram 快速記帳','Phase 2 收據與文字記錄']].map(([number,title,desc]) => <div className="roadmap" key={number}><span>{number}</span><div><h3>{title}</h3><p>{desc}</p></div><LockKeyhole size={15}/></div>)}</section>
           <section className="panel"><h2>系統檢查</h2><p className="muted">確認背景工作能排入並完成。</p><Probe/><div className="system-detail"><span>待處理工作</span><strong>{status?.jobs_pending ?? '—'}</strong></div><div className="system-detail"><span>失敗工作</span><strong>{status?.jobs_failed ?? '—'}</strong></div><div className="system-detail"><span>可用空間</span><strong>{status ? `${(status.disk_free_bytes / 1024 ** 3).toFixed(1)} GB` : '—'}</strong></div>{status?.disk_low && <p className="error">磁碟剩餘空間不足 1 GB。</p>}<p className="footnote">AI、Telegram 與 Notion 尚未啟用。</p></section></div>
         </>}
         {tab === 'settings' && <Preferences user={user} onSave={load}/>}

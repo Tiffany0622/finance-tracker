@@ -18,6 +18,54 @@ from app.core.config import settings
 from app.core.db import MAINTENANCE_LOCK, SCHEMA_VERSION, engine, transaction
 from app.core.models import BackupRun, now
 
+BACKUP_TABLES = (
+    "users",
+    "book_settings",
+    "currencies",
+    "totp_credentials",
+    "accounts",
+    "categories",
+    "ledger_accounts",
+    "transactions",
+    "journal_entries",
+    "postings",
+    "transaction_splits",
+    "fx_quotes",
+    "report_snapshots",
+)
+
+
+def financial_fingerprint(conn: Any) -> str:
+    conn.execute(text("SET LOCAL timezone TO 'UTC'"))
+    if conn.scalar(
+        text(
+            "SELECT count(*) FROM (SELECT e.id FROM journal_entries e LEFT JOIN postings p ON p.entry_id=e.id GROUP BY e.id HAVING count(p.id)<2 OR sum(p.book_amount_signed)<>0) invalid"
+        )
+    ):
+        raise ValueError("unbalanced_ledger")
+    if conn.scalar(
+        text(
+            "SELECT count(*) FROM postings p JOIN ledger_accounts l ON l.id=p.ledger_account_id LEFT JOIN LATERAL (SELECT sum(amount_signed) a,sum(book_amount_signed) b FROM transaction_splits s WHERE s.posting_id=p.id) s ON true WHERE l.ledger_class IN ('income','expense') AND (s.a IS DISTINCT FROM p.amount_signed OR s.b IS DISTINCT FROM p.book_amount_signed)"
+        )
+    ):
+        raise ValueError("unbalanced_splits")
+    digest = hashlib.sha256()
+    for table in (
+        "accounts",
+        "categories",
+        "ledger_accounts",
+        "transactions",
+        "journal_entries",
+        "postings",
+        "transaction_splits",
+        "fx_quotes",
+        "report_snapshots",
+    ):
+        for row in conn.execute(text(f'SELECT row_to_json(t)::text FROM "{table}" t ORDER BY id')):
+            digest.update(row[0].encode())
+            digest.update(b"\n")
+    return digest.hexdigest()
+
 
 def sha256(path: Path) -> str:
     with path.open("rb") as file:
@@ -48,7 +96,10 @@ def verify_backup(path: Path) -> dict[str, Any]:
     if path.is_symlink() or not (path / "manifest.json").is_file():
         raise ValueError("backup_incomplete")
     manifest = json.loads((path / "manifest.json").read_text())
-    if manifest.get("format_version") != 1 or manifest.get("schema_version") != SCHEMA_VERSION:
+    if manifest.get("format_version") != 1 or manifest.get("schema_version") not in (
+        "0001_phase0",
+        SCHEMA_VERSION,
+    ):
         raise ValueError("backup_version_unsupported")
     actual = set()
     for item in path.rglob("*"):
@@ -144,8 +195,9 @@ def _create_backup(backup_id: uuid.UUID) -> Path:
                     with Session(engine()) as db:
                         counts = {
                             name: db.scalar(text(f'SELECT count(*) FROM "{name}"'))
-                            for name in ("users", "book_settings", "currencies", "totp_credentials")
+                            for name in BACKUP_TABLES
                         }
+                        financial_hash = financial_fingerprint(db)
                         db_version = db.scalar(text("SHOW server_version"))
                     files = {
                         str(p.relative_to(staging)): sha256(p)
@@ -160,6 +212,7 @@ def _create_backup(backup_id: uuid.UUID) -> Path:
                         "backup_id": str(backup_id),
                         "created_at": now().isoformat(),
                         "counts": counts,
+                        "financial_hash": financial_hash,
                         "files": files,
                         "secrets": "Keep JWT_SECRET and TOTP_KEY separately; not included as plaintext.",
                     }
@@ -251,13 +304,20 @@ def restore_backup(source: Path, target_url: str, target_data: Path) -> None:
         if (source / "attachments").exists():
             shutil.copytree(source / "attachments", target_data / "attachments")
         with restore_engine.connect() as conn:
-            if conn.scalar(text("SELECT version_num FROM alembic_version")) != SCHEMA_VERSION:
+            if (
+                conn.scalar(text("SELECT version_num FROM alembic_version"))
+                != manifest["schema_version"]
+            ):
                 raise ValueError("restored_schema_mismatch")
             for name, expected in manifest["counts"].items():
-                if name not in {"users", "book_settings", "currencies", "totp_credentials"}:
+                if name not in BACKUP_TABLES:
                     raise ValueError("backup_count_table_invalid")
                 if conn.scalar(text(f'SELECT count(*) FROM "{name}"')) != expected:
                     raise ValueError("restored_count_mismatch")
+            if manifest["schema_version"] == SCHEMA_VERSION and financial_fingerprint(
+                conn
+            ) != manifest.get("financial_hash"):
+                raise ValueError("restored_financial_mismatch")
         for name, expected in manifest["files"].items():
             if name.startswith("attachments/") and sha256(target_data / name) != expected:
                 raise ValueError("restored_attachment_mismatch")

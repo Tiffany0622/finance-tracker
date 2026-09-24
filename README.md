@@ -1,8 +1,18 @@
 # Finance Tracker
 
-保存在自己電腦上的個人財務空間。主要介面為繁體中文 Web；帳戶、記帳與圖表將從 Phase 1 逐步加入。
+保存在自己電腦上的個人財務空間。主要介面為繁體中文 Web，支援銀行／現金／信用卡帳戶、收支、轉帳、退款、圖表及 CSV 快照。
 
-目前已實作 **Phase 0 基礎程式**：登入與可選 TOTP、首次設定、PostgreSQL migration、背景工作、備份 / 隔離還原、CI 與本機啟動腳本。已驗證範圍及尚未完成的部署驗收見 [Phase 0 驗證紀錄](docs/verification/phase-0.md)。此版本尚不能作為完整記帳系統。
+目前進入 **Phase 1 首批手動記帳功能**。登入、TOTP、背景工作與備份沿用 Phase 0；本版範圍及尚未交付項目見 [Phase 1 驗證紀錄](docs/verification/phase-1.md)。尚不代表需求文件中的全部 Phase 1 或 P0 完成。
+
+## 開始記帳
+
+1. 登入並完成偏好設定後，到「帳戶」新增銀行、現金或信用卡帳戶。期初餘額不算收入；信用卡欠款填正數、溢繳填負數。
+2. 到「記帳」新增分類，再記收入或支出。分類支援兩層，也可在一筆交易內分攤；商家、備註與逗號分隔標籤皆可搜尋。
+3. 帳戶間移動款項及繳信用卡費使用「轉帳」。本金不計支出；手續費另選支出分類。跨 USD / TWD 必填實際入帳金額及外幣到帳本幣別的匯率。
+4. 用交易列的「退款」關聯原支出；同幣部分退款採實際退款日期扣減原分類，超額退款會拒絕。「更正／作廢」保留原分錄並沖回，需填原因。
+5. 「總覽」依期間、帳戶、分類或文字篩選產生固定報表。分類點擊可篩選；展開明細核對數字，再「匯出 CSV（ZIP）」下載明細、分類、月度、帳戶、總結與 metadata。文字公式會加安全前綴，數字保持可分析格式；下載檔案不會回寫帳本。
+
+外幣收支使用入帳時填寫的匯率。淨資產另採「帳戶 → 設定外幣估值匯率」保存的估值日期／來源，缺率顯示不完整，不以 1 補值。歷史淨資產曲線目前從有效分錄與已保存匯率**重建**，不是已完成每日封存；分類／文字篩選不適用淨資產。自動匯率、週期記帳、附件、對帳、貸款與完整資料匯出仍列於後續任務。
 
 ## 啟動本機系統
 
@@ -21,7 +31,7 @@ docker compose exec api python -m app.cli init-user
 4. 開啟 [本機財務空間](http://localhost:8080)，登入後選擇自己的基準幣別與時區。請使用這個完整網址；`APP_ORIGIN` 必須與實際瀏覽器來源一致。
 5. 「帳號安全」可將金鑰加入驗證器 App，確認驗證碼後啟用 TOTP。當次顯示的備援碼請另外安全保存；每組只能用一次。
 
-修改 `.env` 後以 `sh scripts/start.sh` 重新套用。要暫停服務使用 `docker compose stop`；不要使用 `down -v`，它會刪除資料庫 volume。
+修改 `.env` 後以 `sh scripts/start.sh` 重新套用。已安裝自動啟動時，先依下方說明進入維護模式，再使用 `docker compose stop`；不要使用 `down -v`，它會刪除資料庫 volume。
 
 剛安裝 Docker Desktop 時，已開啟的終端機可能尚未更新 PATH。`start.sh` 與 plist 產生器會自動尋找 `~/.docker/bin/docker` 及 Docker Desktop 內附指令，不需重新開機。其他 Docker 管理命令可先使用 `~/.docker/bin/docker` 取代 `docker`，或重新開啟終端機並確認 `docker info` 可用。
 
@@ -62,9 +72,9 @@ docker compose run --rm --env-from-file data/restore.env worker \
   --target-data /data/restore-drill
 ```
 
-若安裝的 Compose 不支援 `--env-from-file`，先在本機 shell 安全載入環境檔，再改用 `docker compose run --rm -e RESTORE_DATABASE_URL worker ...`。還原命令不啟動 Bot 或 worker 排程，會核對 Phase 0 核心筆數、schema 及附件雜湊。接著在獨立程序上用目標 DB、原 TOTP / JWT 機密驗證登入，通過後再規劃正式切換；不要直接把正在寫入的正式服務指向演練庫。
+若安裝的 Compose 不支援 `--env-from-file`，先在本機 shell 安全載入環境檔，再改用 `docker compose run --rm -e RESTORE_DATABASE_URL worker ...`。還原命令不啟動 Bot 或 worker 排程，會核對核心與帳本表筆數、schema、附件雜湊、分錄／分攤平衡及完整財務資料指紋。接著在獨立程序上用目標 DB、原 TOTP / JWT 機密驗證登入，通過後再規劃正式切換；不要直接把正在寫入的正式服務指向演練庫。
 
-Phase 1 會把新帳本表、分錄平衡及代表性報表加入還原核對。若磁碟已滿、檔案不足或 manifest 不符，不會把半成品標為成功。
+Phase 1 備份已涵蓋新增帳本表、分錄／分攤平衡、完整資料指紋及固定報表。舊 Phase 0 備份仍可校驗並隔離還原；還原後須遷移至當前 schema 才能啟動新版服務。若磁碟已滿、檔案不足或 manifest 不符，不會把半成品標為成功。
 
 ## 本機原生開發與測試
 
@@ -116,16 +126,28 @@ pnpm --dir frontend test:e2e
 
 ## macOS 開機 / 登入啟動
 
-先完成一次手動 Compose 啟動，並將容器引擎設定為登入時啟動，再生成可審查的 LaunchAgent：
+先完成一次手動 Compose 部署，再安裝使用者登入啟動服務：
 
 ```sh
 python3 scripts/launchd.py
 plutil -lint data/com.finance-tracker.start.plist
+python3 scripts/launchd.py --install
 ```
 
-確認內容後，將該 plist 放入自己的 `~/Library/LaunchAgents/`，使用 `launchctl bootstrap gui/使用者UID 檔案路徑` 載入。它在登入及每 5 分鐘嘗試以 `--no-build` 啟動已有映像，等待引擎最多 60 秒；不會自行安裝或開啟 Docker GUI。日誌在 `data/logs/`。
+LaunchAgent 名稱為 `com.finance-tracker.start`，位於 `~/Library/LaunchAgents/`。登入時及每 60 秒檢查一次；先啟動 Docker Desktop 並等待引擎，接著恢復本專案既有容器。它不重建映像或遷移資料，初次部署及升級仍使用 `start.sh`。獨立啟動程式和日誌位於 `~/Library/Application Support/FinanceTracker/`，避開 macOS 背景程序讀取 Documents 的權限限制；啟動設定不含密碼。
 
-本階段未自動安裝常駐服務，也未變更您的睡眠設定。要完全停止自動啟動，先用 `launchctl bootout gui/使用者UID ~/Library/LaunchAgents/com.finance-tracker.start.plist` 卸載，再停止 Compose。真正闔蓋 / 喚醒及外部備份磁碟測試仍需在您選定的部署環境驗收。
+升級或暫停前，先進入維護模式：
+
+```sh
+touch "$HOME/Library/Application Support/FinanceTracker/maintenance"
+docker compose stop
+# 完成升級並確認健康後，解除維護模式：
+rm "$HOME/Library/Application Support/FinanceTracker/maintenance"
+```
+
+要永久停用，使用 `launchctl bootout gui/使用者UID ~/Library/LaunchAgents/com.finance-tracker.start.plist` 並移走該 plist。睡眠期間服務暫停，喚醒後恢復並補跑到期工作；實測證據見 [Mac 驗收](docs/verification/phase-0-mac.md)。沒有更改主機的睡眠偏好；登入啟動設定已載入，但沒有替使用者登出或重開機。
+
+備份目前保留在專案的 `data/backups/`；外接磁碟／NAS 目的地仍待使用者指定。改用外部路徑時必須先掛載並建立專用目錄，Compose 不會自動建立不存在的備份來源目錄；本機同磁碟備份不能抵抗整顆磁碟損毀。
 
 ## 文件與開發順序
 

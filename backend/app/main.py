@@ -33,6 +33,7 @@ from app.core.models import (
     BackupRun,
     BookSettings,
     Job,
+    JournalEntry,
     SessionFamily,
     TotpCredential,
     User,
@@ -62,6 +63,7 @@ from app.core.security import (
     password_ok,
     revoke_others,
 )
+from app.ledger.routes import router as ledger_router
 
 
 @asynccontextmanager
@@ -74,12 +76,14 @@ app = FastAPI(
     lifespan=lifespan,
     responses={code: {"model": ErrorOutput} for code in (400, 401, 403, 404, 409, 422, 429, 503)},
     title="Finance Tracker",
-    version="0.1.0",
+    version="0.2.0",
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
 )
 PREFIX = "/api/v1"
+
+app.include_router(ledger_router)
 
 
 @app.middleware("http")
@@ -273,7 +277,9 @@ def save_settings(
         assert book
         if book.settings_revision != body.expected_revision:
             raise ApiError(409, "revision_conflict", "設定已更新，請重新載入再修改。")
-        if book.ledger_revision and body.book_currency != book.book_currency:
+        if body.book_currency != book.book_currency and db.scalar(
+            select(JournalEntry.id).where(JournalEntry.owner_id == who.owner_id).limit(1)
+        ):
             raise ApiError(409, "book_currency_locked", "正式入帳後，基準幣別需要另外規劃遷移。")
         book.book_currency, book.timezone = body.book_currency, body.timezone
         book.settings_revision += 1
@@ -420,7 +426,7 @@ def status(who: Principal = Depends(principal)) -> StatusOutput:
         successful_at = success.completed_at if success else None
         free = shutil.disk_usage(settings().data_dir).free
         return StatusOutput(
-            phase="Phase 0",
+            phase="Phase 1 · 手動記帳",
             database="ready",
             disk_free_bytes=free,
             disk_low=free < 1024**3,

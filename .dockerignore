@@ -4,6 +4,8 @@
 !.env.example
 .tools
 .cache
+**/.cache
+**/.pnpm-store
 **/.venv
 **/node_modules
 **/__pycache__
@@ -11,5 +13,6 @@
 **/dist
 data
 backups
-test-results
-playwright-report
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo

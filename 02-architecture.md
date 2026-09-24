@@ -5,7 +5,7 @@
 | 文件版本 | v0.2 |
 | 建立 / 更新日期 | 2026-09-23 |
 | 需求基準 | [01-requirements.md](01-requirements.md) v0.4 |
-| 狀態 | 架構基線；Phase 0 已通過原生環境、遠端 Linux CI 及 Mac arm64 容器部署；常駐 / 睡眠驗收待完成，詳見 docs/verification/phase-0-mac.md |
+| 狀態 | 架構基線；Phase 0 已通過原生環境、遠端 Linux CI 及 Mac arm64 容器部署；登入自動啟動與睡眠恢復已驗；Phase 1 首批手動記帳見 docs/verification/phase-1.md |
 | 配套文件 | [03-data-model.md](03-data-model.md)、[04-dev-plan.md](04-dev-plan.md) |
 
 ## 1. 架構決策與範圍
@@ -263,3 +263,9 @@ E-07 使用每日 `pg_dump` + 附件 manifest。備份期間取得全系統寫�
 - Phase 0 的 DB / API / worker 只連 internal 私有網路；Nginx 同時連接 edge bridge 與私有網路，僅將 Web 發佈至 `127.0.0.1:8080`，並以 HTTP 健康檢查確認代理可用。未來後端需要外部 API 時才增加受控對外網路。開發 Vite 5173 / API 8000 僅綁 loopback。
 - 認證將 refresh token 歷史與撤銷狀態拆成 `auth_sessions` / `session_families`，支援輪替後舊 token 重放時撤銷整個 family。Schema 的精確映射見 03 §14。
 - 各項通過與未驗證的證據見 [Phase 0 驗證紀錄](docs/verification/phase-0.md)。本紀錄不代表 Phase 1 的帳務、圖表或附件功能已完成。
+
+## 13. Phase 1 首批實作界線
+
+`app/ledger` 先集中帳戶、分錄服務、查詢、報表與 CSV。所有業務寫入先取得維護共享鎖，再鎖 owner 的 book_settings；報表使用相同 owner 鎖凍結資料，CSV 僅讀已保存快照。ECharts 6.0.0 使用模組化匯入及 SVG renderer，遵循[官方匯入方式](https://echarts.apache.org/handbook/en/basics/import/)。金額仍由後端 Decimal 計算；圖形座標才轉前端數值。
+
+本版 merchant 為交易文字、tags 為受限字串清單，沒有宣稱正規化商家／標籤庫完成；後續保留原字串遷移至實體與連接表。人工估值匯率與歷史入帳匯率分開保存。淨資產曲線從有效帳本重建並標示狀態，每日封存、自動 provider、附件／週期／全量匯出仍維持 04 的未完成清單。

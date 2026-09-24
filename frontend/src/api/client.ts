@@ -8,7 +8,7 @@ export async function prepareCsrf() {
   if (!response.ok) throw new Error('無法建立安全連線，請稍後重試。');
   csrf = (await response.json()).token;
 }
-export async function api<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
+export async function api<T>(path: string, options: RequestInit = {}, retry = true, responseKind: 'json' | 'blob' = 'json'): Promise<T> {
   const method = options.method ?? 'GET';
   if (method !== 'GET' && !csrf) await prepareCsrf();
   let response: Response;
@@ -19,9 +19,12 @@ export async function api<T>(path: string, options: RequestInit = {}, retry = tr
   if (response.status === 401 && retry && !path.startsWith('/auth/login') && !path.startsWith('/auth/refresh') && !path.startsWith('/auth/totp')) {
     if (!refreshPromise) refreshPromise = api('/auth/refresh', {method: 'POST'}, false).then(() => {}).finally(() => { refreshPromise = null; });
     await refreshPromise;
-    return api<T>(path, options, false);
+    return api<T>(path, options, false, responseKind);
   }
-  const data = await response.json();
+  if (response.ok && responseKind === 'blob') return await response.blob() as T;
+  let data;
+  try { data = await response.json(); }
+  catch { throw new ApiError(response.status, 'invalid_response', '服務暫時無法回應，請稍後重試。'); }
   if (!response.ok) throw new ApiError(response.status, data.code, data.message || '操作失敗，請重試。');
   if (path === '/auth/logout') csrf = '';
   return data as T;

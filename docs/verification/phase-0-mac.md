@@ -41,3 +41,14 @@
 - 原生與 CI 的登入 / TOTP / 工作恢復測試結果仍見首次驗證紀錄；本次部署沒有把測試帳號放入正式資料庫。
 
 目前服務保留運行，無需保持 VS Code 終端機開啟。需要暫停時執行 `~/.docker/bin/docker compose stop`，不要刪除資料庫 volume。
+
+## 登入啟動與真實睡眠收尾（2026-09-23 晚間）
+
+本節是使用者自行建立正式帳號、完成登入後的續驗，更新前文首次部署時的狀態。
+
+- 已安裝並載入 `~/Library/LaunchAgents/com.finance-tracker.start.plist`，RunAtLoad=true、StartInterval=60。獨立啟動程式位於 `~/Library/Application Support/FinanceTracker/autostart.py`，日誌亦在此目錄；不含憑證，避免 Documents 的 macOS 背景存取限制。
+- `launchctl print gui/501/com.finance-tracker.start` 回報 last exit code=0。刻意停止本專案 web／worker 後，由下一次 LaunchAgent 掃描自動恢復，Web ready 通過。未替使用者登出或重開機；不把設定與載入測試冒稱實際重新登入驗收。
+- `pmset -g log`：22:21:05 初次進入睡眠，22:21:36 系統短暫 DarkWake，22:22:20 再次睡眠，22:29:31 因使用者操作喚醒。使用者回覆「已喚醒」。沒有改變主機睡眠設定。
+- 三筆 probe 原訂 22:20:33、22:22:03、22:24:03 執行，實際完成於 22:20:34、22:22:04、22:29:50；均 succeeded、attempts=1，各只有一筆 job_effect。第三筆證明睡眠期間到期工作於喚醒後補跑；診斷沒有寫入財務資料。
+- 正式設定目前 `BACKUP_HOST_DIR=./data/backups`，解析為 `/Users/tiffany/Documents/ChatGPT/finance-tracker/data/backups`。已確認此位置可寫入完整備份。尚無使用者指定的外接磁碟／NAS；同磁碟備份不能取代外部容災，目的地仍待確認。
+- 私人遠端／iPhone 入口保持未配置；仍只在本機 loopback 提供服務。Phase 1 程式工作依使用者本次指示同步開始，D0-07 不因上述部分驗證而整列宣稱 DONE。
