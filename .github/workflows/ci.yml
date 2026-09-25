@@ -64,6 +64,8 @@ jobs:
           PY
       - name: Backend checks and PostgreSQL restore drill
         run: sh scripts/check-backend.sh
+      - name: Local capture setup checks
+        run: python3 -m unittest discover -s scripts/tests -v
       - name: Frontend checks and generated contract drift
         run: |
           pnpm --dir frontend api:generate

@@ -6,14 +6,18 @@
 
 1. 在 Telegram 找到官方 [@BotFather](https://t.me/BotFather)，送出 `/newbot`，依提示建立名稱及 username。
 2. 保存 Bot Token，只在下面的本機隱藏輸入提示貼上，不要貼到聊天、GitHub 或截圖中。
-3. 準備你自己的數字 Telegram User ID（不是 `@username`）。可從 Telegram Desktop 的「設定 → 進階 → 匯出 Telegram 資料」取得 JSON 中的個人 ID。啟用前會將這個 ID 作為唯一私聊白名單；群組及其他帳號不會建立草稿。
+3. 不需要先查數字 User ID。設定時可以用一次性配對碼辨認你的 Telegram 私聊；群組及其他帳號不會建立草稿。
 4. 在專案目錄執行：
 
 ```sh
 python3 scripts/configure-capture.py
 ```
 
-腳本詢問帳本登入帳號、辨識方式、模型名稱及選用的 Bot Token。會透過 `getMe` 核對 Bot，產生僅允許 capture bridge 的 API token、撤銷舊授權，以 0600 權限原子更新 `.env`，再套用 Compose。一次只綁定一個帳本使用者與 Telegram 私聊。整合授權有效 365 天；過期或換 Bot 時重新執行腳本。腳本內的 `yes` 是啟用所選資料流的確認，不會替你建立 Bot 或選付費方案。
+腳本先讀取本機帳本：只有一個帳號時自動選取，多個時依編號選擇；不需輸入 Bot 帳號當作帳本帳號。接著詢問辨識方式、模型名稱及選用的 Bot Token（隱藏輸入，不會顯示字元）。會透過 `getMe` 核對 Bot。詢問數字 User ID 時直接按 Enter，就會顯示一次性的 `/start finance_…` 指令；請在 3 分鐘內把整行傳給自己的 Bot（不是 BotFather），終端機會辨認你的 User ID。不要分享配對碼。若已知道數字 ID，也可以手動填寫。
+
+配對不會確認或刪掉 Telegram 待收訊息；大量積壓、現有輪詢程序或 Webhook 會停止並提示改用手動 ID，不會自動關閉既有整合。最後核對帳本／Bot／User ID，輸入 `yes` 才產生僅允許 capture bridge 的 API token、撤銷舊授權，以 0600 權限原子更新 `.env`，再套用 Compose。一次只綁定一個帳本使用者與 Telegram 私聊。整合授權有效 365 天；過期或換 Bot 時重新執行腳本。腳本不會替你建立 Bot 或選付費方案。
+
+若 Token 曾貼在非隱藏欄位、聊天或截圖中，先到 BotFather 的 `/mybots` → 選 Bot → API Token → Revoke current token，依提示取得新的 Token；Bot 帳號不需重建。程式會分別提示 Token 無效（HTTP 401／404）、DNS／網路、HTTPS 憑證、逾時或限流，不會回顯 Token、完整 API URL 或遠端錯誤內容。TLS 錯誤必須修復憑證或代理設定，不能關閉驗證。
 
 若尚未決定辨識模型，可選 `disabled` 並只填 Bot Token；照片仍會下載並保存為待人工確認的草稿。兩者都關閉時，腳本停用整合容器，核心記帳繼續運作。這個初版停用後保留未處理工作與資料，不會刪除照片。
 
