@@ -92,7 +92,7 @@
 
 D1-03 已交付的交易主檔、修訂、owner 權限及正式記帳服務足以支援本任務；D1-03 其餘分類管理工作仍保留 DOING。D1-04 提供 JPEG / PNG / HEIC 多圖上傳、原檔下載、JPEG 安全預覽、收據／頁序 metadata、移除及冪等重試，且納入一致備份與隔離還原。限制為 20 MiB / 5,000 萬像素 / 每交易 20 張；PDF 與多影格圖片未支援。範圍不包含 OCR 或 Telegram。
 
-驗證見 [D1-04](docs/verification/d1-04-receipts.md)。HEIC 已記錄 Mac 與 Linux arm64 的合成檔相容性；真正 iPhone Safari／使用者相機檔的實機驗收仍列在 D1-08，不用手機尺寸模擬代替。其餘 Phase 1、Phase 1.5、Phase 2 的任務與順序不變。
+驗證見 [D1-04](docs/verification/d1-04-receipts.md)。HEIC 已記錄 Mac 與 Linux arm64 的合成檔相容性；真正 iPhone Safari／使用者相機檔的實機驗收仍列在 D1-08，不用手機尺寸模擬代替。其餘 Phase 1、Phase 1.5 的未完成工作保留；後續使用者要求優先進行自動辨識與 Telegram，調整見下方 Phase 2 首批交付。
 
 ## 4. Phase 1.5：Numbers XLSX 與 PDF
 
@@ -110,12 +110,23 @@ D1-03 已交付的交易主檔、修訂、owner 權限及正式記帳服務足�
 
 | 任務 | 需求 | 前置任務 | 交付與驗收 | 狀態 |
 |---|---|---|---|---|
-| D2-01 | B-07, N-07 | D15-03, D0-04 | Bot 私聊白名單、有限 scope token、durable update / cursor；提交事件後才確認 offset；傳送器 Telegram adapter 與失敗狀態 | TODO |
-| D2-02 | B-01, B-02, B-06 | D2-01, D1-04 | 可插拔本地 / 雲端 provider、結構化草稿、缺值與合計驗證、原始品項保存；以中英收據 fixtures 評估，正式 provider 與 RAM 待 D-04 確認 | TODO |
-| D2-03 | B-04, T-07, B-09 | D2-02, D1-03 | Web / Bot 草稿修正、分類分攤、取消、/pending、確認按鈕 revision；重複點擊 / 程序崩潰僅一筆正式交易；刪草稿與作廢已入帳交易分開 | TODO |
-| D2-04 | B-08, B-05 | D2-03, D1-06 | 商家預設分類 / 標籤可改；/today、/month、/networth 共用報表；/budget 暫明示尚未啟用，完整驗收接 D3-05 | TODO |
+| D2-01 | B-07, N-07 | D0-04, D1-03, D1-04；D15-03 順序依使用者要求後移 | Bot 私聊白名單、有限 scope token、durable update / cursor；提交事件後才確認 offset；傳送器 Telegram adapter 與失敗狀態 | DOING |
+| D2-02 | B-01, B-02, B-06 | D2-01, D1-04 | 可插拔本地 / 雲端 provider、結構化草稿、缺值與合計驗證、原始品項保存；以中英收據 fixtures 評估，正式 provider 與 RAM 待 D-04 確認 | DOING |
+| D2-03 | B-04, T-07, B-09 | D2-02, D1-03 | Web / Bot 草稿修正、分類分攤、取消、/pending、確認按鈕 revision；重複點擊 / 程序崩潰僅一筆正式交易；刪草稿與作廢已入帳交易分開 | DOING |
+| D2-04 | B-08, B-05 | D2-03, D1-06 | 商家預設分類 / 標籤可改；/today、/month、/networth 共用報表；/budget 暫明示尚未啟用，完整驗收接 D3-05 | DOING |
 | D2-05 | N-01, N-08 | D2-01, D1-06 | 每日摘要、時區、安靜時段、頻率控制與通知去重；未設時間不發送；喚醒只補最近摘要；預算比較接 Phase 3 | TODO |
 | D2-06 | B-01, B-02, B-04, B-07, N-07 | D2-03, D2-04, D2-05 | 使用者啟用後端到端驗收：白名單外拒絕、timeout / 限流 / 無金鑰、Telegram 重送、斷線重啟、收據 < 15 秒實測；未達標保留未完成原因 | TODO |
+
+### Phase 2 首批交付與保留項目（2026-09-24）
+
+使用者指定優先實作「自動辨識與 Telegram」，並選擇「尚未決定辨識方式，先完成程式」「尚未建立 Bot」。因此先交付可設定的 provider 與 Bot 程式，正式環境保持 disabled；XLSX / PDF 沒有此功能的技術相依，仍保留原任務，未視為完成。
+
+- D2-01：私聊白名單、有限 scope token、持久事件／游標、租約重試與傳送器已實作；真實 Bot 收送與喚醒整合待啟用。
+- D2-02：Ollama / OpenAI adapter、圖片及文字草稿、Decimal 合計、稅／小費／折扣與缺值提醒、原始中英品項 JSON 已實作；沒有用 adapter mock 宣稱模型實際辨識品質。正式模型、RAM 及 p95 <15 秒待驗。
+- D2-03：Web 修正與分類分攤、Bot 金額／日期／商家修正、帳戶／分類選擇、確認／取消、`/pending`、revision 與冪等已實作。Bot 內多分類分攤、相簿合併多頁、品項逐欄人工修正尚待後續；目前引導至 Web 分攤，原始品項不改寫。
+- D2-04：三個查詢共用既有報表，`/budget` 明示未實作；商家預設規則尚未交付。
+- D2-05 每日摘要與主動通知仍 TODO；未設定時不發送，也未自行決定通知時間。
+- D2-06 真實 Telegram / 模型 / iPhone 端到端與效能仍 TODO。驗證紀錄：[capture-telegram.md](docs/verification/capture-telegram.md)；本機啟用：[capture-setup.md](docs/capture-setup.md)。
 
 ## 6. Phase 3：預算、目標、訂閱與提醒
 

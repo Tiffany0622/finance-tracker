@@ -14,6 +14,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.capture.routes import bridge as capture_bridge_router
+from app.capture.routes import router as capture_router
 from app.core.auth import (
     ApiError,
     Principal,
@@ -86,6 +88,8 @@ PREFIX = "/api/v1"
 
 app.include_router(ledger_router)
 app.include_router(receipts_router)
+app.include_router(capture_router)
+app.include_router(capture_bridge_router)
 
 
 @app.middleware("http")
@@ -452,7 +456,8 @@ def status(who: Principal = Depends(principal)) -> StatusOutput:
             )
             or 0,
             integrations={
-                key: "not_implemented"
-                for key in ("telegram", "cloud_ai", "notion", "market_data", "fx")
+                "telegram": "configured" if settings().telegram_bot_id else "disabled",
+                "cloud_ai": "configured" if settings().capture_provider == "openai" else "disabled",
+                **{key: "not_implemented" for key in ("notion", "market_data", "fx")},
             },
         )

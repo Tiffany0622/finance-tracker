@@ -323,3 +323,13 @@ ReportSnapshot 以不可變 JSON document 保存完整 metadata／指標／明�
 - 移除時在單一 transaction 刪除該交易的兩種引用；沒有任何交易／收據引用後標 deleting。墓碑保留，實體檔案由延遲清理刪除；更正及作廢不刪引用。沒有改動 journal / posting 或報表 snapshot。
 
 驗收與尚未實機驗證的範圍見 [D1-04 驗證紀錄](docs/verification/d1-04-receipts.md)。
+
+## 2026-09-24：Schema 0004_capture 實際交付
+
+- `receipts.transaction_id` 改為 nullable；parse_status 支援 not_requested / processing / parsed / failed，既有 0003 收據原封保留。
+- `capture_drafts`：Owned、receipt_id 唯一且具 owner 複合 FK；source / source_key / request_hash 去重；source_text、proposal JSONB、parsed JSONB、warnings、revision、status、job_id、chat_id、confirmed_transaction_id。confirmed 狀態與正式 transaction 關聯同時成立；確認以 owner BookSettings 鎖序列化，呼叫既有 ledger 冪等服務。
+- `receipt_parse_attempts`：Owned、draft_id（可追溯 receipt）、job_id、attempt_no、provider、model、prompt_version=1、schema_version=1、result JSONB、error_code 及 created_at。每次完成／失敗回傳一筆，(job_id, attempt_no) 唯一；created_at 記錄接收結果時間，程序崩潰未回傳的嘗試由 jobs attempts / lease 記錄，尚未提供逐次 started_at / finished_at。
+- 原始品項目前保留在 parse attempt 與採用結果的 items JSON（原名、數量、單價、列總額）；總額、subtotal、tax、tip、discount 為十進位字串或 null。沒有捏造 0；不把未核對品項放進價格統計。`receipt_items` 正規化表及逐欄人工修正仍待後續 migration。
+- `telegram_events`：Owned、bot_id / update_id 唯一、accepted、時間；不保存未授權訊息內容。已授權文字進草稿，file_id 進下載 job。`telegram_cursors`：bot_id PK、next_offset；與事件／工作同一交易保存。
+- `capture_bridges`：owner_id PK、last_seen，用於顯示整合程序的 API 連線時間。Telegram 已收訊證據另從 accepted events 取得，兩者不冒充 AI 模型健康測試。
+- 未入帳照片由 receipt_attachments 持有；確認時同一交易設 receipt.transaction_id 並建立 transaction_attachments。GC 仍檢查所有引用與 24 小時保留期。備份新增草稿、parse attempts、Telegram inbox / cursor 指紋，允許有草稿引用而尚未有 transaction 的收據。0001 / 0002 / 0003 備份仍可驗證與隔離還原。

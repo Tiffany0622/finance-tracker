@@ -21,28 +21,36 @@ from app.core.models import BackupRun, now
 ATTACHMENT_TABLES = ("attachments", "receipts", "transaction_attachments", "receipt_attachments")
 
 BACKUP_TABLES = (
-    "users",
-    "book_settings",
-    "currencies",
-    "totp_credentials",
-    "accounts",
-    "categories",
-    "ledger_accounts",
-    "transactions",
-    "journal_entries",
-    "postings",
-    "transaction_splits",
-    "fx_quotes",
-    "report_snapshots",
-) + ATTACHMENT_TABLES
+    (
+        "users",
+        "book_settings",
+        "currencies",
+        "totp_credentials",
+        "accounts",
+        "categories",
+        "ledger_accounts",
+        "transactions",
+        "journal_entries",
+        "postings",
+        "transaction_splits",
+        "fx_quotes",
+        "report_snapshots",
+    )
+    + ATTACHMENT_TABLES
+    + ("capture_drafts", "receipt_parse_attempts", "telegram_events", "telegram_cursors")
+)
 
 
-def attachment_fingerprint(conn: Any, data_dir: Path) -> str:
+def attachment_fingerprint(conn: Any, data_dir: Path, legacy: bool = False) -> str:
     from app.receipts.service import file_path
 
     conn.execute(text("SET LOCAL timezone TO 'UTC'"))
     digest = hashlib.sha256()
-    for table in ATTACHMENT_TABLES:
+    for table in ATTACHMENT_TABLES + (
+        ()
+        if legacy
+        else ("capture_drafts", "receipt_parse_attempts", "telegram_events", "telegram_cursors")
+    ):
         for row in conn.execute(
             text(f'SELECT row_to_json(t)::text FROM "{table}" t ORDER BY row_to_json(t)::text')
         ):
@@ -52,7 +60,6 @@ def attachment_fingerprint(conn: Any, data_dir: Path) -> str:
         text("""
         SELECT count(*) FROM attachments a WHERE
         (a.status = 'ready' AND (
-            NOT EXISTS (SELECT 1 FROM transaction_attachments t WHERE t.attachment_id=a.id) OR
             NOT EXISTS (SELECT 1 FROM receipt_attachments r WHERE r.attachment_id=a.id))) OR
         (a.status = 'deleting' AND (
             EXISTS (SELECT 1 FROM transaction_attachments t WHERE t.attachment_id=a.id) OR
@@ -63,7 +70,7 @@ def attachment_fingerprint(conn: Any, data_dir: Path) -> str:
     if conn.scalar(
         text("""
         SELECT count(*) FROM receipt_attachments p JOIN receipts r ON r.id=p.receipt_id
-        WHERE NOT EXISTS (SELECT 1 FROM transaction_attachments t
+        WHERE r.transaction_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM transaction_attachments t
           WHERE t.owner_id=p.owner_id AND t.attachment_id=p.attachment_id AND t.transaction_id=r.transaction_id)
     """)
     ):
@@ -146,6 +153,7 @@ def verify_backup(path: Path) -> dict[str, Any]:
     if manifest.get("format_version") != 1 or manifest.get("schema_version") not in (
         "0001_phase0",
         "0002_ledger",
+        "0003_receipts",
         SCHEMA_VERSION,
     ):
         raise ValueError("backup_version_unsupported")
@@ -384,11 +392,15 @@ def restore_backup(source: Path, target_url: str, target_data: Path) -> None:
                     raise ValueError("restored_count_mismatch")
             if manifest["schema_version"] in (
                 "0002_ledger",
+                "0003_receipts",
                 SCHEMA_VERSION,
             ) and financial_fingerprint(conn) != manifest.get("financial_hash"):
                 raise ValueError("restored_financial_mismatch")
-            if manifest["schema_version"] == SCHEMA_VERSION and attachment_fingerprint(
-                conn, target_data
+            if manifest["schema_version"] in (
+                "0003_receipts",
+                SCHEMA_VERSION,
+            ) and attachment_fingerprint(
+                conn, target_data, legacy=manifest["schema_version"] == "0003_receipts"
             ) != manifest.get("attachment_hash"):
                 raise ValueError("restored_attachment_metadata_mismatch")
         for name, expected in manifest["files"].items():

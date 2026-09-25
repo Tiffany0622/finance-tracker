@@ -208,7 +208,7 @@ class Attachment(Owned, Base):
 
 class Receipt(Owned, Base):
     __tablename__ = "receipts"
-    transaction_id: Mapped[uuid.UUID]
+    transaction_id: Mapped[uuid.UUID | None]
     parse_status: Mapped[str] = mapped_column(default="not_requested")
     __table_args__ = (
         UniqueConstraint("owner_id", "id"),
@@ -216,7 +216,7 @@ class Receipt(Owned, Base):
         ForeignKeyConstraint(
             ["owner_id", "transaction_id"], ["transactions.owner_id", "transactions.id"]
         ),
-        CheckConstraint("parse_status = 'not_requested'"),
+        CheckConstraint("parse_status IN ('not_requested','processing','parsed','failed')"),
     )
 
 
@@ -415,3 +415,72 @@ class ReportSnapshot(Owned, Base):
     document: Mapped[dict[str, Any]] = mapped_column(JSONB)
     content_hash: Mapped[str]
     __table_args__ = (UniqueConstraint("owner_id", "id"),)
+
+
+class CaptureDraft(Owned, Base):
+    __tablename__ = "capture_drafts"
+    receipt_id: Mapped[uuid.UUID]
+    source: Mapped[str]
+    source_key: Mapped[str] = mapped_column(String(120))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    source_text: Mapped[str] = mapped_column(default="")
+    proposal: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    warnings: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    parsed: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    revision: Mapped[int] = mapped_column(default=1)
+    status: Mapped[str] = mapped_column(default="needs_review")
+    job_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("jobs.id"))
+    chat_id: Mapped[int | None] = mapped_column(BigInteger)
+    confirmed_transaction_id: Mapped[uuid.UUID | None]
+    __table_args__ = (
+        UniqueConstraint("owner_id", "id"),
+        UniqueConstraint("owner_id", "source_key"),
+        UniqueConstraint("receipt_id"),
+        ForeignKeyConstraint(["owner_id", "receipt_id"], ["receipts.owner_id", "receipts.id"]),
+        ForeignKeyConstraint(
+            ["owner_id", "confirmed_transaction_id"], ["transactions.owner_id", "transactions.id"]
+        ),
+        CheckConstraint("status IN ('needs_review','processing','confirmed','cancelled','failed')"),
+        CheckConstraint("source IN ('web','telegram')"),
+        CheckConstraint("revision > 0"),
+        CheckConstraint("(status = 'confirmed') = (confirmed_transaction_id IS NOT NULL)"),
+    )
+
+
+class ReceiptParseAttempt(Owned, Base):
+    __tablename__ = "receipt_parse_attempts"
+    draft_id: Mapped[uuid.UUID]
+    job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("jobs.id"))
+    attempt_no: Mapped[int]
+    provider: Mapped[str]
+    model: Mapped[str]
+    prompt_version: Mapped[int] = mapped_column(default=1)
+    schema_version: Mapped[int] = mapped_column(default=1)
+    result: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    error_code: Mapped[str | None]
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["owner_id", "draft_id"], ["capture_drafts.owner_id", "capture_drafts.id"]
+        ),
+        UniqueConstraint("job_id", "attempt_no"),
+    )
+
+
+class TelegramEvent(Owned, Base):
+    __tablename__ = "telegram_events"
+    bot_id: Mapped[int] = mapped_column(BigInteger)
+    update_id: Mapped[int] = mapped_column(BigInteger)
+    accepted: Mapped[bool]
+    __table_args__ = (UniqueConstraint("bot_id", "update_id"),)
+
+
+class TelegramCursor(Base):
+    __tablename__ = "telegram_cursors"
+    bot_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    next_offset: Mapped[int] = mapped_column(BigInteger, default=0)
+
+
+class CaptureBridge(Base):
+    __tablename__ = "capture_bridges"
+    owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

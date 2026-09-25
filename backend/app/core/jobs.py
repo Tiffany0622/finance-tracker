@@ -5,7 +5,7 @@ import uuid
 from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, or_, select, true, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -95,7 +95,9 @@ def dispatch_outbox() -> None:
             # Unknown events stay visible; never acknowledge an unimplemented consumer.
 
 
-def claim() -> tuple[uuid.UUID, uuid.UUID, str] | None:
+def claim(
+    kinds: list[str] | None = None, owner: uuid.UUID | None = None
+) -> tuple[uuid.UUID, uuid.UUID, str] | None:
     with transaction() as db:
         due = or_(
             and_(Job.status.in_(["queued", "retry_wait"]), Job.run_after <= now()),
@@ -103,7 +105,13 @@ def claim() -> tuple[uuid.UUID, uuid.UUID, str] | None:
         )
         job = db.scalar(
             select(Job)
-            .where(due)
+            .where(
+                due,
+                Job.kind.in_(kinds)
+                if kinds
+                else Job.kind.not_in(["capture_parse", "telegram_download", "telegram_send"]),
+                Job.owner_id == owner if owner else true(),
+            )
             .order_by(Job.run_after, Job.id)
             .limit(1)
             .with_for_update(skip_locked=True)

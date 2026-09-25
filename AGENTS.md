@@ -4,7 +4,7 @@ Read `01-requirements.md`, `02-architecture.md`, `03-data-model.md`, `04-dev-pla
 
 ## Scope and data
 
-- Current implementation is Phase 1's manual-ledger delivery (bank/cash/credit card, income/expense/refund/transfer, charts and CSV) plus D1-04 receipt attachments. Remaining Phase 1 tasks stay open in 04-dev-plan.md. Do not show unfinished financial metrics as zero or mark future requirements complete.
+- Current implementation is Phase 1's manual-ledger delivery (bank/cash/credit card, income/expense/refund/transfer, charts and CSV) plus D1-04 receipt attachments and the first capture/Telegram delivery (provider-disabled by default). Remaining Phase 1 tasks stay open in 04-dev-plan.md. Do not show unfinished financial metrics as zero or mark future requirements complete.
 - PostgreSQL is authoritative. Use real PostgreSQL integration tests, Decimal for financial values, migrations for schema changes, and backend-generated report snapshots in later phases.
 - Never commit `.env`, production data, attachments, backups, logs, local runtime downloads or browser sessions. Test fixtures must be synthetic.
 - Do not overwrite user changes or a real DB to make tests pass. `TEST_DATABASE_URL` must name a disposable `finance_test*` database. Tests truncate its app tables and create temporary `finance_restore_*` databases.
@@ -56,3 +56,7 @@ Compose startup: `python3 scripts/configure.py`, `sh scripts/start.sh`, then int
 - Use multiple agents only when the user explicitly requests them or a separately applicable instruction authorizes delegation. This file does not authorize automatic delegation.
 
 - Receipt files must use the receipts service, backup maintenance lock and attachment advisory lock. Keep original bytes private and immutable; publish files before metadata commit. Cleanup must check all references and the 24-hour grace period. Never put production receipts in Git; the tiny receipt fixtures are explicitly synthetic.
+
+- Capture bridge has no DB credentials or attachment volume. Keep network jobs out of the core worker. API rechecks the limited token and Telegram private-chat owner whitelist. Never acknowledge an update before committing its inbox/cursor and effects.
+- Confirm captures in a top-level transaction: the immutable ledger's xmin guard intentionally rejects postings created inside a savepoint. On input errors, roll back first, then record the Telegram error reply/inbox in a new transaction.
+- OCR may only propose data. Preserve unknown values and original parse attempts; explicit user confirmation must call the existing ledger service. Lease and draft revision checks fence stale responses. Keep real provider/Telegram tests pending until the user configures them.

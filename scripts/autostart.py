@@ -40,10 +40,12 @@ def run(docker, state):
         else:
             raise SystemExit('Docker not ready; retry on the next launchd run.')
     names = ['finance-tracker-' + service + '-1' for service in ('db', 'api', 'worker', 'web')]
+    if (state / 'capture-enabled').is_file():
+        names.append('finance-tracker-capture-bridge-1')
     containers = call('inspect', '--format', '{{json .State.Running}} {{index .Config.Labels "com.docker.compose.project"}}', *names)
     containers.check_returncode()
     rows = [line.decode().split() for line in containers.stdout.splitlines()]
-    if len(rows) != 4 or any(len(row) != 2 or row[1] != 'finance-tracker' for row in rows):
+    if len(rows) != len(names) or any(len(row) != 2 or row[1] != 'finance-tracker' for row in rows):
         raise SystemExit('Container ownership mismatch; refusing to start.')
     if all(row[0] == 'true' for row in rows) and ready():
         return

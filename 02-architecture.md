@@ -280,3 +280,15 @@ Pillow 12.3.0 / pillow-heif 1.8.0 鎖定版本；完整解碼後才接受 JPEG /
 所有檔案寫入／清理持有共用備份維護鎖與獨立附件 advisory lock；附件業務寫入再鎖 owner book row。先將兩個檔案以 0600 寫入 UUID staging 目錄、fsync，再原子 rename 至 objects，最後同一 DB transaction 提交 metadata、收據頁序及交易關聯。中途中斷最多留下未引用檔，不出現 DB ready 指向尚未發布的檔案；回覆遺失以同 key 重試取得同一附件。Worker 每 5 分鐘掃描，只清理至少 24 小時的 UUID 孤兒／staging，或確定無引用的 deleting 檔案，拒絕符號連結。ready 檔案缺失或雜湊不符必須報錯。
 
 備份在獨占維護鎖內驗證 DB 引用及原圖／預覽 SHA-256，僅複製 active objects，記錄四張附件／收據表的 metadata 指紋；隔離還原再核對。0001 / 0002 舊備份仍可隔離還原，但須升級 schema 後啟用新版服務。參考：[Pillow Image](https://pillow.readthedocs.io/en/stable/reference/Image.html)、[pillow-heif plugin](https://pillow-heif.readthedocs.io/en/latest/pillow-plugin.html)；本版本以本機與容器實測為準。
+
+## 2026-09-24：Capture / Telegram 首批實作決策
+
+依使用者要求先交付可啟用程式，provider 預設 disabled。Python 模組在 `backend/app/capture/`；Compose `capture-bridge` profile 以同一鎖定映像執行獨立程序，只有 API scoped token、所選 OCR key 及 Bot Token，沒有 DB 憑證或檔案掛載。核心 API / worker 保持 private network；bridge 以 API 取得受租約保護的工作／預覽，分開輪詢、下載、辨識、傳送，OCR 不阻塞收訊。
+
+相容性決策：此批只需要 getMe / getUpdates / getFile / sendMessage / answerCallbackQuery，採 Python 標準函式庫的窄 HTTP adapter 與固定 Telegram API 網域，暫不導入原基線 python-telegram-bot v21；沒有未鎖定第三方依賴。HTTPS、拒絕 redirect、回應大小與逾時、redacted errors、429 retry_after 在共用 transport。若後續指令／事件種類大幅增加，再評估 SDK。
+
+Bridge 分別向 API claim 三種工作；核心 worker 排除這三種。API 核對 owner、token scope/expiry/revocation、lease token 與草稿 revision 後才套用結果。heartbeat 為獨立 metadata 更新，可在備份維護鎖期間續租。長輪詢 offset 只在事件與效果提交後推進；外部回覆為 at-least-once，財務確認用固定 draft id 冪等。Telegram 確認直接使用頂層 DB transaction，避免 ledger xmin 不可變保護與 nested savepoint 的子交易 ID 衝突；輸入失敗先完整 rollback，再另立交易保存 inbox 與錯誤回覆。
+
+Web 與 Bot 共用草稿、保存圖片與 ledger service；AI 只輸出型別化事實，沒有寫帳或工具執行權。圖片以去除中繼資料的 JPEG 預覽送 provider，原圖不可變。未完成照片下載時禁止確認；下載中的人工修改保留，圖片仍保存且不自動覆蓋修改。未確定金額／幣別／日期為 null，不代填帳戶或分類。人工確認是唯一正式入帳入口。
+
+初版一張圖片一份草稿，取消保留圖片及歷程；完整拆分類在 Web，品項正規化與人工逐欄修正後續擴充。可插拔 Ollama / OpenAI Responses（store=false）已實作，但未選型前不呼叫；目前不提供 Gemini / PaddleOCR，也不宣稱任何實測辨識速度。每日通知未啟用。

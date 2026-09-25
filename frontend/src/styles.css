@@ -45,3 +45,15 @@
   .receipt-picker { padding: 16px; }
   .receipt-dialog { padding: 20px; }
 }
+
+/* Receipt capture: keep source evidence alongside reviewable fields. */
+.capture-status{display:flex;flex-wrap:wrap;gap:14px 28px;margin-bottom:20px;color:#55635b;font-size:14px}
+.capture-status span,.capture-inputs h2{display:flex;align-items:center;gap:9px}
+.capture-inputs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:24px 0 36px}
+.capture-inputs .panel{min-width:0}.capture-upload{border:1px dashed #a9b8ad;border-radius:12px;padding:18px;background:#f6f8f4}
+.file-name{overflow-wrap:anywhere}.draft-list{display:grid;gap:12px}.draft-card{display:flex;align-items:center;gap:16px;width:100%;text-align:left;padding:20px;border:1px solid #dce2d9;border-radius:14px;background:#fff;color:inherit}
+.draft-card:hover{border-color:#6d8977;background:#fafcf9}.draft-icon{display:grid;place-items:center;width:46px;height:46px;border-radius:12px;background:#edf3ec;color:#476852;flex-shrink:0}
+.draft-card small{display:block;color:#738076;font-size:12px;margin-top:6px}.draft-card strong{overflow-wrap:anywhere}.draft-amount{margin-left:auto;text-align:right;flex-shrink:0}
+.capture-editor{width:min(1060px,94vw);max-width:1060px}.capture-editor-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:28px}.capture-evidence{min-width:0}.capture-preview{width:100%;max-height:600px;object-fit:contain;border-radius:12px;background:#f1f3ed}
+.capture-editor fieldset{margin:0;padding:0;border:0;min-width:0}.capture-item{display:flex;justify-content:space-between;gap:15px;border-bottom:1px solid #dde3d9;padding:10px 0;font-size:13px}.capture-item small{display:block;color:#738076}.capture-warnings{background:#fff8e9;border:1px solid #eadab4;border-radius:10px;padding:16px;margin-top:20px;font-size:13px;overflow-wrap:anywhere}.capture-warnings ul{padding-left:20px}.capture-warnings li{margin:6px 0}
+@media(max-width:760px){.capture-inputs,.capture-editor-grid{grid-template-columns:1fr}.capture-inputs{gap:16px}.capture-preview{max-height:300px}.draft-card{padding:14px;gap:10px}.draft-icon{display:none}.draft-amount{font-size:13px}.capture-status{gap:10px}.capture-editor{width:96vw}}

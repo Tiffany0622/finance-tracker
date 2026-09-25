@@ -74,6 +74,7 @@ jobs:
         run: |
           pnpm --dir frontend exec playwright install --with-deps chromium
           cd backend
+          .venv/bin/python tests/seed_e2e.py
           .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log > /tmp/finance-api.log 2>&1 &
           .venv/bin/python -m app.worker > /tmp/finance-worker.log 2>&1 &
           cd ../frontend

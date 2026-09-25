@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlsplit
 
 from cryptography.fernet import Fernet
@@ -19,6 +20,10 @@ class Settings(BaseSettings):
     app_commit: str = "development"
     access_minutes: int = Field(default=15, ge=1, le=60)
     session_days: int = Field(default=7, ge=1, le=30)
+    capture_provider: Literal["disabled", "ollama", "openai"] = "disabled"
+    capture_model: str = Field(default="", max_length=100)
+    telegram_bot_id: int = Field(default=0, ge=0)
+    telegram_user_id: int = Field(default=0, ge=0)
     lease_seconds: int = Field(default=60, ge=3, le=3600)
 
     @model_validator(mode="after")

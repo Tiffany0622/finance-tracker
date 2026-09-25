@@ -13,6 +13,10 @@ x-app: &app
     DATA_DIR: /data
     BACKUP_DIR: /backups
     APP_COMMIT: ${APP_COMMIT:-development}
+    CAPTURE_PROVIDER: ${CAPTURE_PROVIDER:-disabled}
+    CAPTURE_MODEL: ${CAPTURE_MODEL:-}
+    TELEGRAM_BOT_ID: ${TELEGRAM_BOT_ID:-0}
+    TELEGRAM_USER_ID: ${TELEGRAM_USER_ID:-0}
   networks: [private]
   init: true
   user: "${APP_UID:-10001}:${APP_GID:-10001}"
@@ -63,6 +67,24 @@ services:
     command: [python, -m, app.worker]
     depends_on:
       migrate: {condition: service_completed_successfully}
+    restart: unless-stopped
+  capture-bridge:
+    image: finance-tracker-backend:local
+    profiles: [capture]
+    command: [python, -m, app.capture.bridge]
+    environment:
+      CAPTURE_API_URL: http://api:8000/api/v1/capture-bridge
+      CAPTURE_BRIDGE_TOKEN: ${CAPTURE_BRIDGE_TOKEN:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+    networks: [private, edge]
+    depends_on:
+      api: {condition: service_healthy}
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     restart: unless-stopped
   web:
     build:
