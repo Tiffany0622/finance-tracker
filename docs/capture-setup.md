@@ -29,7 +29,27 @@ python3 scripts/configure-capture.py
 | ollama | Mac 上可用的 Ollama 視覺模型，支援結構化 JSON | 去除 EXIF / GPS 的 JPEG 預覽送至 Mac Ollama；文字送同一模型 |
 | openai | 可用的視覺模型完整 ID、OpenAI API Key | JPEG 預覽或文字送 OpenAI Responses API，`store=false`；另計 API 費用 |
 
-不預先指定或下載模型，不以合成 adapter 測試宣稱實際辨識品質。模型選定後應以你的中英文收據量測準確度與延遲。`store=false` 不代表所有服務端保留政策都被關閉。
+此 Mac 已選 macOS 原生 Ollama + `qwen3-vl:8b-instruct`（M4 Pro / 24 GB）。首次安裝下載約 6.1 GB，後續本機推論不需 AI API Key 或每次 API 費用；Telegram 傳輸仍需網路。本機模型也會辨識錯字或金額，須核對原圖。不以合成 adapter 測試宣稱實際辨識品質；多份中英文收據與冷暖啟動延遲仍需量測。`store=false` 不代表雲端服務所有保留政策都被關閉。
+
+### 本機模型安裝與啟用
+
+1. 從 [Ollama 官方 Mac 下載頁](https://ollama.com/download/mac) 安裝到 `/Applications/Ollama.app`。本專案以 LaunchAgent 啟動內附 CLI，勿同時讓 Ollama GUI 與本服務各自啟動 server。
+2. 在專案目錄執行以下命令（已有 Telegram 配對時不必重跑 Bot 設定）：
+
+```sh
+python3 scripts/ollama-launchd.py --install
+/Applications/Ollama.app/Contents/Resources/ollama pull qwen3-vl:8b-instruct
+python3 scripts/enable-local-ai.py
+python3 scripts/enable-local-ai.py --apply
+```
+
+第一個腳本會生成 `data/com.finance-tracker.ollama.plist`，並安裝到 `~/Library/LaunchAgents`。它僅綁本機、設定 `OLLAMA_NO_CLOUD=1` 關閉雲端、context 8192、一次一份請求；閒置 2 分鐘卸載模型，下一份收據需重新載入。模型留在 `~/.ollama`，日誌在 `~/Library/Application Support/FinanceTracker/logs`。
+
+請使用完整 `8b-instruct` 標籤。Ollama registry 的 `8b`／`latest` 在此次查驗對應 thinking 版本；即使 API 設定 `think=false`，本次實測仍產生長推理並逾時，不能當作 Instruct 的同義名稱。[官方模型標籤](https://ollama.com/library/qwen3-vl/tags)。首次 GPU 初始化可能較久，效能紀錄見 [本機驗證](verification/local-ai.md)。
+
+不加 `--apply` 僅檢查本機 vision 模型與 Docker 連線；會用短暫容器探測，不啟動另一份 Telegram 輪詢，檢查失敗不改 `.env`。套用後保留 Bot Token／白名單／既有整合授權，並重建 Web 代理以重新解析 API 的內部位址。到網頁「收據草稿」開啟之前的照片，按「重新辨識」；新照片會自動建立辨識工作。仍須核對金額／日期／幣別、選帳戶及分類後再確認入帳。
+
+要停止 AI 但保留 Telegram 收件，可在本機 `.env` 僅將 `CAPTURE_PROVIDER` 改成 `disabled`，然後執行 `docker compose up -d --no-build --wait`；不要刪 Bot 設定或 `capture-enabled` 標記。停止原生模型服務可執行 `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.finance-tracker.ollama.plist`；若要取消下次登入啟動，再移除該專案 plist。模型檔不會因此刪除。
 
 Ollama 建議直接在 Mac 執行以使用 Apple 硬體；整合容器使用 `http://host.docker.internal:11434`。若容器不能連到僅綁 loopback 的 Ollama，需另外確認 Ollama 綁定／Mac 防火牆；本腳本不自動開放 LAN port。進階使用也可在 Mac 原生執行 `python -m app.capture.bridge`，使用 `CAPTURE_API_URL=http://localhost:8080/api/v1/capture-bridge` 與 `OLLAMA_URL=http://localhost:11434`，並在本機安全載入所需的整合機密；先停用 Compose 整合容器與 capture-enabled 自動恢復標記，勿同時執行兩份 Bot。不要將 Ollama 的無驗證介面直接暴露到網際網路。
 

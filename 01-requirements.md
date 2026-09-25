@@ -2,11 +2,11 @@
 
 | 項目 | 內容 |
 |---|---|
-| 文件版本 | v0.4（草稿；圖表呈現與報表匯出規劃已確認） |
+| 文件版本 | v0.5（草稿；圖表呈現、報表匯出與本機 AI 規劃已確認） |
 | 建立日期 | 2026-09-22 |
-| 最後更新 | 2026-09-23（v0.4：確認 Web 為主要儀表板、Numbers / PDF 單向匯出、Notion 後續僅同步摘要；新增 §1.6、§2.5.1 與驗收條件，更新相關里程碑） |
-| 狀態 | 🟡 整體需求討論中；§1.6 與 §2.5.1 為已確認決策，其餘待確認事項仍見 §9 |
-| 部署環境 | MacBook Pro（Apple M4）本地端自架；資料庫與附件主副本存本機，外部服務資料流向見 §1.6 與 §3 |
+| 最後更新 | 2026-09-24（v0.5：確認 M4 Pro / 24 GB，採原生 Ollama + Qwen3-VL 8B Instruct；沿用 v0.4 Web／匯出／Notion 決策） |
+| 狀態 | 🟡 整體需求討論中；§1.6、§2.5.1 與 Q6／Q17 為已確認決策，其餘待確認事項仍見 §9 |
+| 部署環境 | MacBook Pro（Apple M4 Pro / 24 GB）本地端自架；資料庫與附件主副本存本機，外部服務資料流向見 §1.6 與 §3 |
 | 使用裝置 | iPhone（Telegram / Safari） |
 | 開發方式 | 由 AI Coding Agent（OpenAI Codex / Claude Code）依本系列文件實作 |
 | 後續文件 | 02-architecture.md、03-data-model.md、04-dev-plan.md、AGENTS.md（定案後撰寫） |
@@ -27,8 +27,8 @@
 
 ### 1.3 使用者與環境
 - 主要使用者：專案擁有者本人（單一使用者為主，預留多使用者/家庭帳本擴充）。
-- 主機：**MacBook Pro（Apple M4，Apple Silicon）**
-  - 統一記憶體架構適合跑本地 LLM（Ollama + Qwen2.5-VL / Llama 系列），本地 OCR / Vision 方案可行性高。
+- 主機：**MacBook Pro（Apple M4 Pro，24 GB 統一記憶體；2026-09-24 實機確認）**
+  - 已選 macOS 原生 Ollama + Qwen3-VL 8B Instruct 作為本機收據辨識；AI 僅填草稿，人工核對後才入帳。
   - 容器：Docker Desktop for Mac 或 OrbStack（較省資源）。
   - 排程 / 常駐：需注意 **筆電睡眠** 會中斷排程；解法見 §3 非功能需求。
 - 手機：**iPhone**
@@ -384,7 +384,7 @@ flowchart TB
 
     subgraph External["外部服務（可選 / 可關閉）"]
         LLM_CLOUD[雲端 Vision LLM / Embedding<br/>OpenAI / Gemini]
-        LLM_LOCAL[本地模型（macOS 原生 Ollama）<br/>Qwen2.5-VL + bge-m3 + PaddleOCR]
+        LLM_LOCAL[本地模型（macOS 原生 Ollama）<br/>Qwen3-VL 8B Instruct；檢索模型後續選型]
         PRICE[市價 / 匯率 API<br/>yfinance / TWSE / CoinGecko / ExchangeRate]
     end
 
@@ -452,7 +452,7 @@ flowchart TB
 | Telegram Bot | **python-telegram-bot v21** | aiogram | 文件完整、支援 Inline Keyboard |
 | 排程 | **APScheduler** | Celery + Redis | 單機足夠，避免額外服務 |
 | 收據辨識（雲端） | **OpenAI GPT-4o / Gemini 2.x Vision** | Claude Vision | 結構化 JSON 輸出、多語（英 / 中文收據）效果佳 |
-| 收據辨識（本地） | **Ollama（Qwen2.5-VL 7B）+ PaddleOCR** | MLX-VLM（Apple 原生） | 離線、隱私；M4 統一記憶體可順跑 7B 級 Vision 模型（建議 ≥ 16GB RAM） |
+| 收據辨識（本地） | **macOS 原生 Ollama + Qwen3-VL 8B Instruct**（2026-09-24 選定） | MLX-VLM；必要時再評估額外 OCR | M4 Pro / 24 GB；本機推論、關閉雲端，準確度及延遲須實測；本批不增加 PaddleOCR 相依 |
 | 語音轉文字 | **faster-whisper（本地）** | OpenAI Whisper API | P2 功能 |
 | 市價 / 匯率 | **yfinance、CoinGecko API、TWSE OpenAPI、exchangerate.host** | Alpha Vantage | 免費 |
 | 財務計算 | **pandas、numpy-financial、pyxirr** | — | XIRR、攤還表 |
@@ -617,7 +617,7 @@ finance-tracker/
 | Q3 | 報稅身分 | Single / Married Filing Jointly / Head of Household |
 | Q4 | 是否有**自雇 / 1099 收入**？ | 影響是否需 X-08 季度預繳試算 |
 | Q5 | 投資標的範圍 | 美股 / 台股 / 加密貨幣 / 債券 / 基金 — 各自是否需第一版支援？ |
-| ~~Q6~~ | ~~電腦是否有 GPU？~~ | ✅ 已確認：MacBook Pro M4，本地 LLM 可行。**補問：RAM 容量（16 / 24 / 32 / 48GB+）？** 影響可跑的本地模型大小 |
+| ~~Q6~~ | 主機規格 | ✅ 2026-09-24 實機確認：MacBook Pro M4 Pro、24 GB 統一記憶體 |
 | ~~Q7~~ | ~~電腦作業系統~~ | ✅ 已確認：macOS。**補問：MacBook 是否會常態接電、不闔蓋 24h 運作？** 若否，每日推播採「喚醒後補發」策略 |
 | Q8 | 手機在外是否需要開 Web 儀表板？ | 是 → 需 Tailscale / Cloudflare Tunnel |
 | Q9 | 每日推播時間 | 例：21:30 |
@@ -628,7 +628,7 @@ finance-tracker/
 | Q14 | 其他功能的 Phase 順序 | 圖表 / 匯出 / Notion 的先後順序已確認（§1.6、§8）；其他模組順序是否符合優先需求？P-09 目前排在 Phase 5，是否要提前？ |
 | Q15 | P-09 查找範圍 | 除收據品項外，是否也要比對「無收據的手動記帳備註」？（預設：是） |
 | Q16 | P-09 商品照片保存 | 查詢用的商品照片是否保留（可加入願望清單）或查完即刪？（預設：查完即刪） |
-| Q17 | 雲端 LLM 供應商 | 已有 OpenAI / Google / Anthropic 哪家 API Key？決定雲端 Vision 預設供應商 |
+| ~~Q17~~ | AI 辨識方案 | ✅ 採本機 Ollama + `qwen3-vl:8b-instruct`，不啟用雲端及自動雲端備援。Telegram 傳輸仍經 Telegram；辨識結果需人工確認 |
 | Q18 | 薪酬結構 | 是否有 RSU / 獎金 / ESPP？雇主是否提供 401(k) Match、HSA？決定 C-01~C-04 的實作深度 |
 | Q19 | 預測預設參數 | 預設年化報酬率（建議 5% / 7% / 9% 三情境）、通膨率（3%）、薪資成長率（3%）是否接受？ |
 | Q20 | FIRE 目標 | 是否有目標退休年齡或目標資產？退休後預估年支出？（可待系統上線後再設） |

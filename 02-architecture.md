@@ -37,7 +37,7 @@
 | PDF | Jinja2 可信任模板 + Playwright Python / Chromium 列印 | 使用本機字型、共用 ECharts 報表繪圖 bundle，從快照產生固定版面；Phase 1.5 驗證 arm64 |
 | Bot | python-telegram-bot，依需求 v21 為相容性起點 | Long polling，避免為收訊息開公開入口；確切版本與 API 需求在 Phase 2 鎖定 |
 | 排程 | APScheduler 3.x + 自有持久化 Job 表 | APScheduler 只觸發掃描，補跑與去重由業務表負責，不依賴記憶體排程狀態 |
-| AI | Provider 介面；本地 Ollama、雲端供應商按 Q17 選定 | 雲端預設不傳資料；測試有 fake provider；模型 ID 可設定、需做收據品質測試 |
+| AI | Provider 介面；正式採 macOS 原生 Ollama + Qwen3-VL 8B Instruct | M4 Pro / 24 GB；關閉雲端，測試有 fake provider；模型 ID 可設定、需做收據品質測試 |
 | 認證 | Argon2 密碼雜湊、短效 JWT + 可撤銷 refresh session、可選 TOTP | 遵循需求；token 儲存與 CSRF 規則見 §8 |
 | 部署 | Docker Compose；Ollama 原生 macOS | API / DB / worker 可重建；本地模型使用 macOS 的硬體加速能力 |
 | 驗證 | pytest、Hypothesis、Vitest、Playwright；GitHub Actions | 帳本不變量、API / DB 整合、瀏覽器流程；CI 僅使用虛構資料 |
@@ -238,7 +238,7 @@ E-07 使用每日 `pg_dump` + 附件 manifest。備份期間取得全系統寫�
 | D-01 幣別、時區、分類 | Q1、Q10；時區另需首次設定 | 測試可用 USD / America/Los_Angeles 虛構帳本；正式帳本由首次設定選取，不能視為個人答案 | 第一筆正式交易前 |
 | D-02 稅務身分 / 地區 / 自雇 | Q2、Q3、Q4 | 不猜州別、報稅身分、居住者資格或 1099；未設定的稅務計算停用 | Phase 6 |
 | D-03 投資支援範圍 | Q5 | 保留所有需求資產類型，不把未支援標的視為股票套公式；按類型逐項驗收 | Phase 4 |
-| D-04 AI、RAM、語言與速度 | Q6、Q12、Q17；§1.2 與 §3 效能口徑 | Phase 0 可做 fake provider；正式測試模型及限制，不承諾 M4 必達速度 | Phase 2；若目標需變更先改需求 |
+| D-04 AI、RAM、語言與速度 | Q6、Q12、Q17；§1.2 與 §3 效能口徑 | 已選原生 Ollama + Qwen3-VL 8B Instruct，實機 M4 Pro / 24 GB；多語品質、冷暖啟動及 p95 待驗，不承諾必達速度 | Phase 2；若目標需變更先改需求 |
 | D-05 常駐 / 遠端 / 推播 | Q7、Q8、Q9 | 本機 Web 預設；排程可設定但未設定不發送；睡眠恢復按 §7 | Phase 2 實際啟用前 |
 | D-06 匯入及家庭帳本 | Q11、Q13 | 沒有真實資料仍可開發；單使用者 + owner_id，不實作多人權限 | 匯入或新增使用者前 |
 | D-07 商品查找範圍 / 照片 | Q15、Q16 | 沿用需求預設：搜尋手動備註，查詢照片用後清理；設定可調整 | Phase 5 |
@@ -292,3 +292,11 @@ Bridge 分別向 API claim 三種工作；核心 worker 排除這三種。API �
 Web 與 Bot 共用草稿、保存圖片與 ledger service；AI 只輸出型別化事實，沒有寫帳或工具執行權。圖片以去除中繼資料的 JPEG 預覽送 provider，原圖不可變。未完成照片下載時禁止確認；下載中的人工修改保留，圖片仍保存且不自動覆蓋修改。未確定金額／幣別／日期為 null，不代填帳戶或分類。人工確認是唯一正式入帳入口。
 
 初版一張圖片一份草稿，取消保留圖片及歷程；完整拆分類在 Web，品項正規化與人工逐欄修正後續擴充。可插拔 Ollama / OpenAI Responses（store=false）已實作，但未選型前不呼叫；目前不提供 Gemini / PaddleOCR，也不宣稱任何實測辨識速度。每日通知未啟用。
+
+### 本機模型選定（2026-09-24）
+
+使用者採本機方案，選 `qwen3-vl:8b-instruct`（Q4_K_M，模型約 6.1 GB）。Ollama 安裝於 `/Applications/Ollama.app`，以本機 LaunchAgent `com.finance-tracker.ollama` 啟動原生 `ollama serve`，使用 Apple GPU；不在 Linux 容器執行模型。模型下載存 `~/.ollama`，不納入 Git 或帳本備份，可依版本與 digest 重新下載。
+
+服務僅綁 `127.0.0.1:11434`，`OLLAMA_NO_CLOUD=1`，沒有雲端失敗備援。Docker Desktop 的 `host.docker.internal` 連線路徑在此 Mac 實測可用；換機先探測，不自動開放 LAN。一次載入一個模型、單一並行請求、context 8192、閒置 2 分鐘卸載模型。LaunchAgent 為登入後服務，睡眠時不能辨識；實際睡眠喚醒仍須另驗。
+
+`scripts/enable-local-ai.py` 先檢查本機模型具有 vision 能力且非遠端模型，再從 capture-bridge 驗證連線；失敗不寫設定。通過後以 `--apply` 保留原有 Telegram 配對及機密、原子更新 provider 設定並套用 Compose。只重新辨識使用者選取的草稿，不批次覆蓋其他人工草稿，也不確認交易。安裝與實測結果見 `docs/verification/local-ai.md`。

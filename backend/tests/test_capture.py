@@ -485,6 +485,7 @@ def test_provider_adapters_structured_contract_and_no_key(logged_in, monkeypatch
     )
     assert result.items[0].raw_name == "蘋果 Apples"
     assert calls[-1][1]["format"]["additionalProperties"] is False
+    assert calls[-1][1]["think"] is False
     assert calls[-1][1]["messages"][1]["images"]
     result = providers.parse(
         "openai", "synthetic", "", b"image", ollama_url="", openai_key="synthetic-only"

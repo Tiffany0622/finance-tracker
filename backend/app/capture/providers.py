@@ -43,6 +43,7 @@ def parse(
             {
                 "model": model,
                 "stream": False,
+                "think": False,
                 "format": schema,
                 "messages": [{"role": "system", "content": PROMPT}, message],
                 "options": {"temperature": 0},
