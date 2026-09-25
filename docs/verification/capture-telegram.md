@@ -33,7 +33,7 @@
 ## 尚待真實啟用驗收
 
 - 尚未選定實際模型，未下載 Ollama 模型或呼叫付費 API；模型準確度、真實中英文收據品質及 p95 <15 秒保持未驗證。
-- 使用者已建立 Bot；本機仍未成功設定，沒有以真實 Telegram 帳號做收送、手機拍照或新 Bot 睡眠喚醒驗收。
+- 使用者已建立並啟用 Bot；真實私聊收訊、照片保存與 Bot 回覆已通過（見下方），新 Bot 睡眠喚醒、完整確認入帳流程仍待驗收。
 - 手機尺寸自動測試不代表真實 iPhone Safari 驗收。原始收據圖片 fixture 為明確標示 TEST DATA ONLY 的合成圖。
 - 首批一張圖一份草稿，未實作相簿／多頁合併；Bot 內完整拆分類改在 Web 操作，商品正規化與品項逐欄人工修改尚待後續。
 - 商家預設規則、每日摘要與主動排程通知未交付，Phase 2 未整體標 DONE。正式備份目的地仍沿用本機 data/backups，外接目的地待使用者指定。
@@ -48,3 +48,11 @@ GitHub 首次檢查的後端與前端步驟通過；瀏覽器 fixture 因 CI 缺
 使用者實際操作時混淆帳本帳號與 Bot 帳號，且原程式將 Telegram 所有失敗合併成同一訊息。現在從本機列出可用帳本、單帳號自動選取；隱藏欄位無法關閉回顯時停止；Telegram HTTP／DNS／憑證／逾時錯誤分開提示但不顯示 Token 或 URL。未知 User ID 可用 3 分鐘有效的隨機配對碼，僅接受相符私聊本人，輪詢不推進 offset、不改 allowed_updates，以保留待收訊息。
 
 新增 13 項本機腳本測試（不連 DB／Telegram），在 Mac Python 3.9.6 與專案 Python 3.12 均通過；覆蓋帳號選擇、誤貼 Token、隱藏輸入失敗、HTTP／網路錯誤去識別化、無效／過大回應、群組／轉傳／舊配對碼拒絕、配對逾時與滿佇列保留、失敗不改設定、成功設定檔 0600 權限與保留既有項目；納入 GitHub CI。Ruff 通過，本機唯讀帳本自動選取通過。Mac 系統 Python 3.9.6 對 Telegram 公開 HTTPS 的無 Token 連線通過，這只證明當時 HTTPS 正常，不能判定先前隱藏輸入的 Token 為何遭拒。尚未使用新的真實 Token 做驗證，正式設定保持不變。
+
+## 首次真實 Telegram 收件與容器 HTTPS 修正
+
+使用者後續自行完成 Token／私聊配對並傳送收據，provider 仍為 disabled。第一次啟動的 bridge 持續出現 remote_unavailable；容器 DNS 正常，但標準庫 HTTPS 可重現 SSLCertVerificationError。根因為 PostgreSQL 基底未含 ca-certificates，且 uv Python 的預設 cafile 與 Debian bundle 路徑不同。
+
+Dockerfile 現在明確安裝 CA bundle、設定 SSL_CERT_FILE，並於建置時檢查信任庫非空；沒有關閉 TLS 驗證。Mac arm64 映像建置通過，僅重建 capture-bridge，核心 API／DB 持續運行。新容器載入 150 個 CA，對 Telegram 公開 HTTPS 驗證成功（200）。
+
+修正後，bridge 自動接收之前的待收訊息；唯讀核對照片下載工作 succeeded、原圖及預覽檔存在、對應草稿 needs_review 且未入帳。Telegram 回覆工作亦 succeeded，Web 顯示「已收到訊息」及待確認草稿。實際收據、Token、私人 ID 與訊息內容均未加入 Git。這證明收件／保存／回覆鏈路可用，不代表已完成 OCR、所有白名單負例、完整財務確認或睡眠喚醒驗收。

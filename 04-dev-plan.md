@@ -115,18 +115,18 @@ D1-03 已交付的交易主檔、修訂、owner 權限及正式記帳服務足�
 | D2-03 | B-04, T-07, B-09 | D2-02, D1-03 | Web / Bot 草稿修正、分類分攤、取消、/pending、確認按鈕 revision；重複點擊 / 程序崩潰僅一筆正式交易；刪草稿與作廢已入帳交易分開 | DOING |
 | D2-04 | B-08, B-05 | D2-03, D1-06 | 商家預設分類 / 標籤可改；/today、/month、/networth 共用報表；/budget 暫明示尚未啟用，完整驗收接 D3-05 | DOING |
 | D2-05 | N-01, N-08 | D2-01, D1-06 | 每日摘要、時區、安靜時段、頻率控制與通知去重；未設時間不發送；喚醒只補最近摘要；預算比較接 Phase 3 | TODO |
-| D2-06 | B-01, B-02, B-04, B-07, N-07 | D2-03, D2-04, D2-05 | 使用者啟用後端到端驗收：白名單外拒絕、timeout / 限流 / 無金鑰、Telegram 重送、斷線重啟、收據 < 15 秒實測；未達標保留未完成原因 | TODO |
+| D2-06 | B-01, B-02, B-04, B-07, N-07 | D2-03, D2-04, D2-05 | 使用者啟用後端到端驗收：白名單外拒絕、timeout / 限流 / 無金鑰、Telegram 重送、斷線重啟、收據 < 15 秒實測；未達標保留未完成原因 | DOING |
 
 ### Phase 2 首批交付與保留項目（2026-09-24）
 
-使用者指定優先實作「自動辨識與 Telegram」，並選擇「尚未決定辨識方式，先完成程式」「尚未建立 Bot」。因此先交付可設定的 provider 與 Bot 程式，正式環境保持 disabled；XLSX / PDF 沒有此功能的技術相依，仍保留原任務，未視為完成。
+使用者指定優先實作「自動辨識與 Telegram」，最初選擇「尚未決定辨識方式，先完成程式」「尚未建立 Bot」。先交付預設關閉的 provider 與 Bot 程式；後續使用者已建立並啟用 Bot，真實收件／照片保存／回覆通過，AI provider 仍 disabled。XLSX / PDF 沒有此功能的技術相依，仍保留原任務，未視為完成。
 
-- D2-01：私聊白名單、有限 scope token、持久事件／游標、租約重試與傳送器已實作；真實 Bot 收送與喚醒整合待啟用。
+- D2-01：私聊白名單、有限 scope token、持久事件／游標、租約重試與傳送器已實作；已修復容器 CA bundle 並驗證真實 Bot 收件／回覆，喚醒整合仍待驗。
 - D2-02：Ollama / OpenAI adapter、圖片及文字草稿、Decimal 合計、稅／小費／折扣與缺值提醒、原始中英品項 JSON 已實作；沒有用 adapter mock 宣稱模型實際辨識品質。正式模型、RAM 及 p95 <15 秒待驗。
 - D2-03：Web 修正與分類分攤、Bot 金額／日期／商家修正、帳戶／分類選擇、確認／取消、`/pending`、revision 與冪等已實作。Bot 內多分類分攤、相簿合併多頁、品項逐欄人工修正尚待後續；目前引導至 Web 分攤，原始品項不改寫。
 - D2-04：三個查詢共用既有報表，`/budget` 明示未實作；商家預設規則尚未交付。
 - D2-05 每日摘要與主動通知仍 TODO；未設定時不發送，也未自行決定通知時間。
-- D2-06 真實 Telegram / 模型 / iPhone 端到端與效能仍 TODO。驗證紀錄：[capture-telegram.md](docs/verification/capture-telegram.md)；本機啟用：[capture-setup.md](docs/capture-setup.md)。
+- D2-06 已開始真實 Telegram 收件驗收；OCR、完整確認入帳、iPhone 端到端、喚醒與效能仍待驗。驗證紀錄：[capture-telegram.md](docs/verification/capture-telegram.md)；本機啟用：[capture-setup.md](docs/capture-setup.md)。
 
 ## 6. Phase 3：預算、目標、訂閱與提醒
 
