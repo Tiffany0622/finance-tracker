@@ -31,7 +31,7 @@
 
 - 真實隔離 PostgreSQL finance_test：69 項測試通過；含版本 1 工作相容、重試版本與歷史保存、7 組幣別來源／衝突案例、延遲回覆不覆蓋人工修改、確認冪等及 bridge 流程。
 - Ruff / format、mypy、Alembic check、OpenAPI 產生通過；API 契約未改。
-- 前端 2 項既有 client 測試與 TypeScript / Vite build 通過；Docker API / Web build 通過。Vite 仍提示既有主 bundle 大小，非本次新阻擋。
+- 前端 4 項 client 測試與 TypeScript / Vite build 通過；Docker API / Web build 通過。Vite 仍提示既有主 bundle 大小，非本次新阻擋。
 - 本機評估腳本獨立執行，不在 CI 假裝呼叫真實模型；CI 使用合成 adapter / PostgreSQL 整合測試。
 
 ## 本機部署
@@ -39,5 +39,11 @@
 部署時以維護標記暫停自動恢復，停止舊 capture-bridge 後依序更新 API / worker、bridge 與 Web；完成後移除標記。Web ready endpoint 回覆 ready，實際瀏覽器顯示本機辨識整合服務運作中、Telegram 已收到訊息；bridge heartbeat 在 60 秒內。
 
 部署前後 transactions 與 capture_drafts 的整列指紋一致；辨識歷程筆數未增加，已入帳／取消狀態維持。這次沒有把測試資料寫入正式帳本。隔離測試 PostgreSQL 已停止；正式 Docker 資料庫及 Ollama 繼續運作。
+
+## GitHub 瀏覽器檢查發現的登入競態
+
+[首次 CI](https://github.com/Tiffany0622/finance-tracker/actions/runs/36106460598) 後端／還原演練、設定腳本、前端及契約檢查通過，瀏覽器 7 / 8 通過；最後一項在登入時失敗。合成 trace 顯示初始頁同時呼叫兩次 CSRF endpoint，接著 refresh 與 login 回應 403，畫面提示驗證失效。React StrictMode 會重複執行初始化 effect，原本兩份 token 請求可能讓 Cookie 與前端 token 不一致。
+
+修正 client 的 `prepareCsrf()`，並行初始化及尚無 token 的 mutation 共用一份 pending promise；成功與失敗皆釋放 pending promise，失敗仍可重試。沒有關閉 CSRF、放寬 Origin 或提高登入限流。兩項新增單元測試確認只發出一次 token 請求、mutation 等待同一 token，以及失敗後可重新初始化；前端共 4 項通過。保留首次失敗證據，後續以新提交重跑完整 CI。
 
 後續仍需更多中英文實拍樣本、冷暖多次延遲、長收據／模糊照片、iPhone 端到端與 Ollama 睡眠喚醒。D2-02 / D2-06 保持 DOING。

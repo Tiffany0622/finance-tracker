@@ -1,12 +1,18 @@
 let csrf = '';
+let csrfPromise: Promise<void> | null = null;
 let refreshPromise: Promise<void> | null = null;
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
 }
-export async function prepareCsrf() {
-  const response = await fetch('/api/v1/auth/csrf', {credentials: 'same-origin', cache: 'no-store'});
-  if (!response.ok) throw new Error('無法建立安全連線，請稍後重試。');
-  csrf = (await response.json()).token;
+export function prepareCsrf(): Promise<void> {
+  if (!csrfPromise) {
+    csrfPromise = (async () => {
+      const response = await fetch('/api/v1/auth/csrf', {credentials: 'same-origin', cache: 'no-store'});
+      if (!response.ok) throw new Error('無法建立安全連線，請稍後重試。');
+      csrf = (await response.json()).token;
+    })().finally(() => { csrfPromise = null; });
+  }
+  return csrfPromise;
 }
 export async function api<T>(path: string, options: RequestInit = {}, retry = true, responseKind: 'json' | 'blob' = 'json'): Promise<T> {
   const method = options.method ?? 'GET';
