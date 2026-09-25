@@ -199,33 +199,7 @@ def retry(
     identity: uuid.UUID, body: DraftAction, request: Request, user: Principal = Depends(principal)
 ) -> DraftOutput:
     with transaction() as db:
-        book_lock(db, user.owner_id)
-        row = owned(db, CaptureDraft, user.owner_id, identity)
-        service.editable(row, body.expected_revision)
-        if row.status == "processing":
-            job = db.get(Job, row.job_id) if row.job_id else None
-            if job and job.status not in {"failed", "cancelled"}:
-                fail("工作仍在處理或等待重試。", "draft_processing", 409)
-        row.revision += 1
-        job = db.get(Job, row.job_id) if row.job_id else None
-        if (
-            job
-            and job.kind == "telegram_download"
-            and not service.draft_output(db, row).attachment_id
-        ):
-            from app.core.jobs import enqueue
-
-            row.status = "processing"
-            row.job_id = enqueue(
-                db,
-                row.owner_id,
-                "telegram_download",
-                f"download:{row.id}:{row.revision}",
-                job.payload,
-            )
-        else:
-            service.queue_parse(db, row)
-        audit(db, user.owner_id, "capture.retry", str(row.id), request)
+        row = service.retry_draft(db, user.owner_id, identity, body.expected_revision, request)
         db.flush()
         return service.draft_output(db, row)
 

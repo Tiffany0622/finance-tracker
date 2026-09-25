@@ -333,3 +333,5 @@ ReportSnapshot 以不可變 JSON document 保存完整 metadata／指標／明�
 - `telegram_events`：Owned、bot_id / update_id 唯一、accepted、時間；不保存未授權訊息內容。已授權文字進草稿，file_id 進下載 job。`telegram_cursors`：bot_id PK、next_offset；與事件／工作同一交易保存。
 - `capture_bridges`：owner_id PK、last_seen，用於顯示整合程序的 API 連線時間。Telegram 已收訊證據另從 accepted events 取得，兩者不冒充 AI 模型健康測試。
 - 未入帳照片由 receipt_attachments 持有；確認時同一交易設 receipt.transaction_id 並建立 transaction_attachments。GC 仍檢查所有引用與 24 小時保留期。備份新增草稿、parse attempts、Telegram inbox / cursor 指紋，允許有草稿引用而尚未有 transaction 的收據。0001 / 0002 / 0003 備份仍可驗證與隔離還原。
+
+2026-09-25 Telegram 核對按鈕沿用上述 schema：幣別選擇寫 proposal 並增加 revision，原始 parsed 與 receipt_parse_attempts 不改。重試確認以 callback 內的 revision 防止舊卡片覆蓋修改，實際重試新增具唯一 logical_key 的工作；不新增臨時確認表或改寫既有工作／歷程。資料庫版本保持 0004_capture。

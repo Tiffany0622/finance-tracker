@@ -248,6 +248,32 @@ def cancel(
     return row
 
 
+def retry_draft(
+    db: Session, owner: uuid.UUID, identity: uuid.UUID, revision: int, request: Any
+) -> CaptureDraft:
+    """Web and Telegram share the same revision fence and durable retry path."""
+    book_lock(db, owner)
+    row = owned(db, CaptureDraft, owner, identity)
+    editable(row, revision)
+    job = db.get(Job, row.job_id) if row.job_id else None
+    if row.status == "processing" and job and job.status not in {"failed", "cancelled"}:
+        fail("工作仍在處理或等待重試。", "draft_processing", 409)
+    row.revision += 1
+    if job and job.kind == "telegram_download" and not draft_output(db, row).attachment_id:
+        row.status = "processing"
+        row.job_id = enqueue(
+            db,
+            row.owner_id,
+            "telegram_download",
+            f"download:{row.id}:{row.revision}",
+            job.payload,
+        )
+    else:
+        queue_parse(db, row)
+    audit(db, owner, "capture.retry", str(row.id), request)
+    return row
+
+
 def validate_parsed(result: ParsedReceipt) -> list[str]:
     warnings = []
     for key, label in [

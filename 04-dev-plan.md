@@ -123,7 +123,7 @@ D1-03 已交付的交易主檔、修訂、owner 權限及正式記帳服務足�
 
 - D2-01：私聊白名單、有限 scope token、持久事件／游標、租約重試與傳送器已實作；已修復容器 CA bundle 並驗證真實 Bot 收件／回覆，喚醒整合仍待驗。
 - D2-02：Ollama / OpenAI adapter、圖片及文字草稿、Decimal 合計、稅／小費／折扣與缺值提醒、原始中英品項 JSON 已實作；正式模型與 RAM 已確認，已加入提示版本 2、小計／最終付款區分、使用者明確幣別驗證與合成圖片評估。3 份合成圖的金額／日期符合，原始模型因 1 份幣別猜測僅 2 / 3 案例通過；更多實拍樣本、p50 / p95 <15 秒及記憶體壓力仍待驗。品質見 [receipt-quality.md](docs/verification/receipt-quality.md)，模型安裝與實測見 [local-ai.md](docs/verification/local-ai.md)，不把單張通過視為品質／效能全面達標。
-- D2-03：Web 修正與分類分攤、Bot 金額／日期／商家修正、帳戶／分類選擇、確認／取消、`/pending`、revision 與冪等已實作。Bot 內多分類分攤、相簿合併多頁、品項逐欄人工修正尚待後續；目前引導至 Web 分攤，原始品項不改寫。
+- D2-03：Web 修正與分類分攤、Bot 金額／日期／商家修正、幣別／帳戶／分類選擇、確認／取消、`/pending`、revision 與冪等已實作。新增原始小計／稅／小費／折扣核對卡片、重新辨識與下載重試的二次確認；處理中提供進度與取消，舊按鈕不可覆蓋新修改。自動測試見 [telegram-review.md](docs/verification/telegram-review.md)，手機實際按鈕驗收仍待使用者操作。Bot 內多分類分攤、相簿合併多頁、品項逐欄人工修正尚待後續；目前引導至 Web 分攤，原始品項不改寫。
 - D2-04：三個查詢共用既有報表，`/budget` 明示未實作；商家預設規則尚未交付。
 - D2-05 每日摘要與主動通知仍 TODO；未設定時不發送，也未自行決定通知時間。
 - D2-06 真實 Telegram 收件及單張本機 OCR → 草稿 → Bot 回覆已驗收；最初小計誤讀已由提示版本 2 的原圖唯讀比對改善，幣別推測仍由人工核對。使用者已自行將該草稿入帳；本次不重跑或修改已入帳草稿。完整 iPhone 操作驗收、喚醒、多樣本品質與效能仍待驗。驗證紀錄：[capture-telegram.md](docs/verification/capture-telegram.md)、[local-ai.md](docs/verification/local-ai.md)；本機啟用：[capture-setup.md](docs/capture-setup.md)。
