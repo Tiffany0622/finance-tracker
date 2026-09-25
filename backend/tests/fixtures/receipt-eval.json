@@ -1,0 +1,48 @@
+[
+  {
+    "id": "tip-after-total",
+    "lines": [
+      "TEST DATA ONLY - SYNTHETIC RECEIPT",
+      "Example Cafe", "2026-02-03", "Currency: USD",
+      "Tea        2 x 4.00       8.00",
+      "Cake       1 x 4.00       4.00",
+      "Subtotal                12.00",
+      "Sales Tax 8%             0.96",
+      "Total                   12.96",
+      "Tip                      2.00",
+      "Discount                 0.00",
+      "CREDIT CARD SALE        14.96"
+    ],
+    "expected": {"occurred_on": "2026-02-03", "currency": "USD", "subtotal": "12.00", "tax": "0.96", "tip": "2.00", "discount": "0.00", "amount": "14.96"}
+  },
+  {
+    "id": "twd-receipt-discount",
+    "lines": [
+      "TEST DATA ONLY - 合成測試收據",
+      "範例商店", "日期 2026-02-04", "幣別 TWD",
+      "茶葉  2 x 100.00       200.00",
+      "小計                  200.00",
+      "折扣                   20.00",
+      "稅金                    9.00",
+      "小費                    0.00",
+      "實付                  189.00"
+    ],
+    "expected": {"occurred_on": "2026-02-04", "currency": "TWD", "subtotal": "200.00", "tax": "9.00", "tip": "0.00", "discount": "20.00", "amount": "189.00"}
+  },
+  {
+    "id": "cash-change-unknown-currency",
+    "lines": [
+      "TEST DATA ONLY - SYNTHETIC RECEIPT",
+      "Example Cash Shop", "2026-02-05",
+      "Notebook                $12.40",
+      "Subtotal                $12.40",
+      "Tax                      $0.00",
+      "Tip                      $0.00",
+      "Discount                 $0.00",
+      "TOTAL                   $12.40",
+      "CASH TENDERED           $20.00",
+      "CHANGE                   $7.60"
+    ],
+    "expected": {"occurred_on": "2026-02-05", "currency": null, "subtotal": "12.40", "tax": "0.00", "tip": "0.00", "discount": "0.00", "amount": "12.40"}
+  }
+]

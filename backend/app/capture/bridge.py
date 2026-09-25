@@ -104,6 +104,7 @@ class Bridge:
                         image,
                         ollama_url=self.ollama_url,
                         openai_key=self.openai_key,
+                        prompt_version=payload.get("prompt_version", 1),
                     )
                     body["parsed"] = result.model_dump(mode="json")
                 elif job["kind"] == "telegram_download":

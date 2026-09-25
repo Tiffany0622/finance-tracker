@@ -1,0 +1,33 @@
+{
+  "model": "qwen3-vl:8b-instruct",
+  "prompt_version": 2,
+  "at": "2026-09-25T06:44:19.084244+00:00",
+  "results": [
+    {
+      "case": "tip-after-total",
+      "repeat": 1,
+      "mismatches": {},
+      "seconds": 26.24,
+      "passed": true
+    },
+    {
+      "case": "twd-receipt-discount",
+      "repeat": 1,
+      "mismatches": {},
+      "seconds": 15.59,
+      "passed": true
+    },
+    {
+      "case": "cash-change-unknown-currency",
+      "repeat": 1,
+      "mismatches": {
+        "currency": {
+          "expected": null,
+          "actual": "USD"
+        }
+      },
+      "seconds": 12.17,
+      "passed": false
+    }
+  ]
+}

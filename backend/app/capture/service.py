@@ -27,6 +27,7 @@ from app.ledger.schemas import TransactionInput
 from app.ledger.service import book_lock, create_transaction, fail, owned
 from app.receipts import service as files
 
+from .prompts import PROMPT_VERSION, explicit_currency
 from .schemas import DraftAction, DraftEdit, DraftOutput, ParsedReceipt, Proposal
 
 
@@ -82,6 +83,7 @@ def queue_parse(db: Session, row: CaptureDraft) -> None:
             "revision": row.revision,
             "provider": cfg.capture_provider,
             "model": cfg.capture_model,
+            "prompt_version": PROMPT_VERSION,
         },
     )
 
@@ -319,6 +321,7 @@ def apply_parse(db: Session, job: Job, result: ParsedReceipt | None, error: str 
                 attempt_no=job.attempts,
                 provider=job.payload["provider"],
                 model=job.payload["model"],
+                prompt_version=job.payload.get("prompt_version", 1),
                 result=result.model_dump(mode="json") if result else None,
                 error_code=error,
             )
@@ -337,10 +340,19 @@ def apply_parse(db: Session, job: Job, result: ParsedReceipt | None, error: str 
     proposal.amount = result.amount
     proposal.occurred_on = result.occurred_on
     proposal.merchant = result.merchant or ""
-    proposal.currency = result.currency if result.currency in {"USD", "TWD"} else None  # type: ignore[assignment]
+    currency = result.currency
+    prompt_version = job.payload.get("prompt_version", 1)
+    if prompt_version >= 2:
+        currency = currency if currency == explicit_currency(row.source_text) else None
+    proposal.currency = currency if currency in {"USD", "TWD"} else None  # type: ignore[assignment]
     row.proposal = proposal.model_dump(mode="json")
     row.parsed = result.model_dump(mode="json")
     row.warnings = validate_parsed(result)
+    if prompt_version >= 2 and result.currency and proposal.currency is None:
+        row.warnings = [
+            *row.warnings,
+            "AI 幣別僅供參考，請對照收據手動選擇；不以地址或 $ 符號推定。",
+        ]
     row.status = "needs_review"
     row.revision += 1
     receipt.parse_status = "parsed"

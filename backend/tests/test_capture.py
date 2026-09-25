@@ -13,6 +13,7 @@ from test_receipts import picture
 
 from app.capture import providers, service
 from app.capture.bridge import Bridge, normalize
+from app.capture.prompts import PROMPT_V1, PROMPT_VERSION
 from app.capture.schemas import DraftAction, ParsedReceipt
 from app.capture.transport import RemoteError
 from app.core.backup import create_backup, restore_backup, verify_backup
@@ -181,7 +182,10 @@ def test_ocr_validated_but_no_account_invented_or_ledger_write(logged_in, monkey
     assert result["status"] == "needs_review" and result["proposal"]["amount"] == "10.50"
     assert result["proposal"]["account_id"] is None and result["proposal"]["category_id"] is None
     assert result["parsed"]["items"][0]["raw_name"] == "蘋果 Apples"
-    assert not result["warnings"] and balances(logged_in) == before
+    assert result["proposal"]["currency"] is None
+    assert result["parsed"]["currency"] == "USD"
+    assert result["warnings"] == ["AI 幣別僅供參考，請對照收據手動選擇；不以地址或 $ 符號推定。"]
+    assert balances(logged_in) == before
     assert action(logged_in, result).status_code == 422
     with Session(engine()) as db:
         assert db.scalar(select(func.count()).select_from(ReceiptParseAttempt)) == 1
@@ -487,6 +491,29 @@ def test_provider_adapters_structured_contract_and_no_key(logged_in, monkeypatch
     assert calls[-1][1]["format"]["additionalProperties"] is False
     assert calls[-1][1]["think"] is False
     assert calls[-1][1]["messages"][1]["images"]
+    assert "JSON schema:" in calls[-1][1]["messages"][0]["content"]
+    providers.parse(
+        "ollama",
+        "synthetic",
+        "",
+        None,
+        ollama_url="http://localhost:11434",
+        openai_key="",
+        prompt_version=1,
+    )
+    assert calls[-1][1]["messages"][0]["content"] == PROMPT_V1
+    count = len(calls)
+    with pytest.raises(RemoteError, match="prompt_version_unsupported"):
+        providers.parse(
+            "ollama",
+            "synthetic",
+            "",
+            None,
+            ollama_url="http://localhost:11434",
+            openai_key="",
+            prompt_version=999,
+        )
+    assert len(calls) == count
     result = providers.parse(
         "openai", "synthetic", "", b"image", ollama_url="", openai_key="synthetic-only"
     )
@@ -739,9 +766,13 @@ def test_full_bridge_photo_to_parse_and_reply_without_network(logged_in, monkeyp
     monkeypatch.setattr(worker, "api", api_call)
     monkeypatch.setattr(worker, "telegram", telegram_call)
     monkeypatch.setattr(adapter, "request_bytes", bytes_call)
-    monkeypatch.setattr(
-        providers, "parse", lambda *args, **kwargs: ParsedReceipt.model_validate(PARSED)
-    )
+    parsed_versions = []
+
+    def parse_receipt(*args, **kwargs):
+        parsed_versions.append(kwargs["prompt_version"])
+        return ParsedReceipt.model_validate(PARSED)
+
+    monkeypatch.setattr(providers, "parse", parse_receipt)
     tg(logged_in, headers, 1, file_id="synthetic-photo")
     worker.perform(next_job(logged_in, headers, "telegram_download"))
     worker.perform(next_job(logged_in, headers, "capture_parse"))
@@ -753,6 +784,77 @@ def test_full_bridge_photo_to_parse_and_reply_without_network(logged_in, monkeyp
     assert rows[0]["proposal"]["amount"] == "10.50" and rows[0]["attachment_id"]
     assert any("10.50" in message["text"] for message in sent)
     assert rows[0]["status"] == "needs_review" and balances(logged_in) == before
+    assert parsed_versions == [PROMPT_VERSION]
+    with Session(engine()) as db:
+        assert db.scalar(select(ReceiptParseAttempt)).prompt_version == PROMPT_VERSION
+
+
+def test_legacy_parse_job_retains_prompt_version_and_history(logged_in, monkeypatch):
+    configure(monkeypatch)
+    setup(logged_in)
+    with Session(engine()) as db:
+        before = db.scalar(select(func.count()).select_from(Transaction))
+    headers = auth()
+    row = image(logged_in)
+    with transaction() as db:
+        draft = db.get(CaptureDraft, uuid.UUID(row["id"]))
+        job = db.get(Job, draft.job_id)
+        assert job.payload["prompt_version"] == PROMPT_VERSION
+        job.payload = {
+            k: v for k, v in job.payload.items() if k not in {"prompt_version", "schema_version"}
+        }
+    legacy = next_job(logged_in, headers)
+    assert "prompt_version" not in legacy["payload"]
+    assert complete(logged_in, headers, legacy, parsed=PARSED).status_code == 200
+    row = get_draft(logged_in, row)
+    retry = action(logged_in, row, "retry")
+    assert retry.status_code == 200
+    current = next_job(logged_in, headers)
+    assert current["payload"]["prompt_version"] == PROMPT_VERSION
+    assert (
+        complete(logged_in, headers, current, parsed={**PARSED, "subtotal": "9.99"}).status_code
+        == 200
+    )
+    with Session(engine()) as db:
+        attempts = list(
+            db.scalars(select(ReceiptParseAttempt).order_by(ReceiptParseAttempt.created_at))
+        )
+        assert [a.prompt_version for a in attempts] == [1, PROMPT_VERSION]
+        assert [a.schema_version for a in attempts] == [1, 1]
+        assert [a.result["subtotal"] for a in attempts] == ["10.00", "9.99"]
+        assert db.scalar(select(func.count()).select_from(Transaction)) == before
+
+
+@pytest.mark.parametrize(
+    "currency,source_text,accepted",
+    [
+        ("USD", "$10", None),
+        ("USD", "Example City, USA", None),
+        ("USD", "", None),
+        ("USD", "USD", "USD"),
+        ("TWD", "NT$", "TWD"),
+        ("USD", "NT$", None),
+        ("USD", "USD 10 / TWD 300", None),
+    ],
+)
+def test_currency_requires_explicit_user_input(
+    logged_in, monkeypatch, currency, source_text, accepted
+):
+    configure(monkeypatch)
+    setup(logged_in)
+    headers = auth()
+    row = image(logged_in)
+    job = next_job(logged_in, headers)
+    with transaction() as db:
+        db.get(CaptureDraft, uuid.UUID(row["id"])).source_text = source_text
+    parsed = {**PARSED, "currency": currency}
+    assert complete(logged_in, headers, job, parsed=parsed).status_code == 200
+    current = get_draft(logged_in, row)
+    assert current["proposal"]["currency"] == accepted
+    assert current["parsed"]["currency"] == currency
+    assert current["status"] == "needs_review"
+    if accepted is None:
+        assert any("AI 幣別僅供參考" in w for w in current["warnings"])
 
 
 def test_transport_rate_limit_redacts_remote_body(monkeypatch):

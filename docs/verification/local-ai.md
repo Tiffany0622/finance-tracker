@@ -32,3 +32,5 @@ Instruct 的首次直接測試耗時 **23.7 秒**（其中模型載入 9.9 秒�
 單張測試不代表多種中英文收據、長收據、遮擋及不同光線全面通過；p95 <15 秒、冷暖多次量測與新整合睡眠喚醒保持待驗。AI 只能更新草稿，仍需人工選帳戶／分類、核對並確認。
 
 參考：[Ollama 模型標籤](https://ollama.com/library/qwen3-vl/tags)、[Mac 安裝](https://docs.ollama.com/macos)、[Thinking 控制](https://docs.ollama.com/capabilities/thinking)。
+
+後續提示版本 2 已改善這張原圖的小計辨識，並針對幣別猜測加入獨立防護；合成案例結果與未達標項目見 [收據品質修正](receipt-quality.md)。此處保留首次版本 1 測試歷史。

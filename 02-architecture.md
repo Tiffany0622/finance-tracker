@@ -300,3 +300,13 @@ Web 與 Bot 共用草稿、保存圖片與 ledger service；AI 只輸出型別�
 服務僅綁 `127.0.0.1:11434`，`OLLAMA_NO_CLOUD=1`，沒有雲端失敗備援。Docker Desktop 的 `host.docker.internal` 連線路徑在此 Mac 實測可用；換機先探測，不自動開放 LAN。一次載入一個模型、單一並行請求、context 8192、閒置 2 分鐘卸載模型。LaunchAgent 為登入後服務，睡眠時不能辨識；實際睡眠喚醒仍須另驗。
 
 `scripts/enable-local-ai.py` 先檢查本機模型具有 vision 能力且非遠端模型，再從 capture-bridge 驗證連線；失敗不寫設定。通過後以 `--apply` 保留原有 Telegram 配對及機密、原子更新 provider 設定並套用 Compose。只重新辨識使用者選取的草稿，不批次覆蓋其他人工草稿，也不確認交易。安裝與實測結果見 `docs/verification/local-ai.md`。
+
+### 收據品質修正（提示版本 2）
+
+新版提示分別讀取小計、含稅 Total、小費及最終付款；現金找零不視為支出。Ollama 除 `format` 外，提示也附 JSON schema，依 [官方 structured outputs 建議](https://docs.ollama.com/capabilities/structured-outputs) 提供欄位定義，temperature 維持 0。這能改善已知小計誤讀，但不保證所有圖片正確。
+
+建立 `capture_parse` 工作時固定 `payload.prompt_version`；bridge 使用該版本，完成或失敗時寫入 `receipt_parse_attempts.prompt_version`。既有缺少版本的工作沿用版本 1，舊提示與原始辨識歷程保留。資料 schema 與解析 schema 均未變更。
+
+模型可能推測幣別，甚至捏造「原圖印有 US$」的證據，因此不以模型自述作驗證。版本 2 只有在使用者原始文字／Telegram 圖說明確寫出唯一 USD、US$、美元／美金或 TWD、NT$、新台幣／新臺幣，且與模型結果一致時才帶入幣別；純圖片、裸 $、地址、相互衝突的代碼留待人工選擇。模型建議仍保留於原始結果及辨識歷程，網頁標明僅供參考。帳戶／分類與確認入帳仍由使用者決定。
+
+`scripts/evaluate-local-ai.py` 用版本控制的中英合成圖片獨立量測本機模型，沒有 DB 或 Telegram 寫入；模型猜錯仍回報失敗，不以應用層防護偽裝成 OCR 正確。品質與效能紀錄見 [receipt-quality.md](docs/verification/receipt-quality.md)。

@@ -328,7 +328,7 @@ ReportSnapshot 以不可變 JSON document 保存完整 metadata／指標／明�
 
 - `receipts.transaction_id` 改為 nullable；parse_status 支援 not_requested / processing / parsed / failed，既有 0003 收據原封保留。
 - `capture_drafts`：Owned、receipt_id 唯一且具 owner 複合 FK；source / source_key / request_hash 去重；source_text、proposal JSONB、parsed JSONB、warnings、revision、status、job_id、chat_id、confirmed_transaction_id。confirmed 狀態與正式 transaction 關聯同時成立；確認以 owner BookSettings 鎖序列化，呼叫既有 ledger 冪等服務。
-- `receipt_parse_attempts`：Owned、draft_id（可追溯 receipt）、job_id、attempt_no、provider、model、prompt_version=1、schema_version=1、result JSONB、error_code 及 created_at。每次完成／失敗回傳一筆，(job_id, attempt_no) 唯一；created_at 記錄接收結果時間，程序崩潰未回傳的嘗試由 jobs attempts / lease 記錄，尚未提供逐次 started_at / finished_at。
+- `receipt_parse_attempts`：Owned、draft_id（可追溯 receipt）、job_id、attempt_no、provider、model、prompt_version、schema_version=1、result JSONB、error_code 及 created_at。建立工作時將提示版本固定在 jobs payload，目前新工作為 2，舊工作缺值視為 1；每次完成／失敗回傳時記錄實際工作版本，(job_id, attempt_no) 唯一。原始 result 保留模型建議，草稿 proposal 可依明確幣別驗證留 null，不回寫修改舊 result。created_at 記錄接收結果時間，程序崩潰未回傳的嘗試由 jobs attempts / lease 記錄，尚未提供逐次 started_at / finished_at。
 - 原始品項目前保留在 parse attempt 與採用結果的 items JSON（原名、數量、單價、列總額）；總額、subtotal、tax、tip、discount 為十進位字串或 null。沒有捏造 0；不把未核對品項放進價格統計。`receipt_items` 正規化表及逐欄人工修正仍待後續 migration。
 - `telegram_events`：Owned、bot_id / update_id 唯一、accepted、時間；不保存未授權訊息內容。已授權文字進草稿，file_id 進下載 job。`telegram_cursors`：bot_id PK、next_offset；與事件／工作同一交易保存。
 - `capture_bridges`：owner_id PK、last_seen，用於顯示整合程序的 API 連線時間。Telegram 已收訊證據另從 accepted events 取得，兩者不冒充 AI 模型健康測試。

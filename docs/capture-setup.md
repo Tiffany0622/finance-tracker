@@ -57,6 +57,7 @@ Ollama 建議直接在 Mac 執行以使用 Apple 硬體；整合容器使用 `ht
 
 - **網頁**：收據草稿 → 選圖或輸入文字 → 等待辨識／手動修正 → 儲存草稿修改 → 核對提醒 → 確認入帳。支援 USD / TWD，帳戶幣別須與填寫幣別相同；跨基準幣記帳仍需入帳匯率。分類分攤在網頁編輯，合計須等於總額。
 - **Telegram**：先對自己的 Bot 送 `/start`，接著傳單張照片、圖片文件或記帳文字。以文件傳送可避免 Telegram 的相片壓縮；本機保存的是 Telegram 實際提供的位元組。
+- **幣別核對**：新版圖片草稿預設由你選幣別；AI 的猜測只顯示為參考。若文字或照片圖說明確寫 `USD`、`US$`、美元／美金或 `TWD`、`NT$`、新台幣／新臺幣，且只出現一種幣別並與辨識一致，才自動帶入。僅有 `$` 或地址不會自動推定。Bot 可用 `/edit 草稿編號 currency=USD` 補齊；所有資料仍須確認才入帳。
 - Bot 回覆草稿後，可按「選擇帳戶」「選擇分類」「確認入帳」「取消草稿」。金額或日期等可用 `/edit 草稿編號 amount=10.50 date=2026-09-24 currency=USD merchant="商家名稱"` 修正；完整分攤、標籤及匯率在 Mac 網頁調整。
 - `/pending` 列最近 10 份未完成草稿，`/pending 2` 看下一頁；`/today`、`/month`、`/networth` 使用帳本時區與既有報表快照；`/budget` 明示尚未實作。
 - 每張圖片最多 20 MiB，支援 JPEG / PNG / HEIC。初版一張圖片一份草稿；相簿多圖會分成多份，**尚未自動合併多頁收據**。PDF、多影格圖與商品 `/lookup` 不在本次範圍。
@@ -73,3 +74,13 @@ Mac 睡眠期間不能處理，喚醒後接續已保存工作。Telegram 尚未�
 網頁顯示整合程序最近是否連線、Telegram 是否已收到過訊息，不把金鑰已設定當成模型已通過實測。可查看 `docker compose logs --tail=50 capture-bridge`；程式只輸出錯誤代碼，不記錄金鑰、遠端錯誤本文或收據內容。每日摘要與推播排程尚未實作，因此沒有主動排程通知。
 
 參考：[Telegram Bot API](https://core.telegram.org/bots/api)、[Ollama vision](https://docs.ollama.com/capabilities/vision)、[Ollama structured outputs](https://docs.ollama.com/capabilities/structured-outputs)、[OpenAI structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs)、[OpenAI image inputs](https://developers.openai.com/api/docs/guides/images-vision)。
+
+## 開發者：重跑本機辨識評估
+
+在已安裝後端鎖定依賴、Ollama 與模型的 Mac 執行：
+
+```sh
+backend/.venv/bin/python scripts/evaluate-local-ai.py --output .tools/receipt-eval.json
+```
+
+腳本將 `backend/tests/fixtures/receipt-eval.json` 的合成收據渲染成圖片，逐欄比較金額、日期及幣別；不讀真實收據、不寫帳本、不連 Telegram／雲端。任一欄位不符以非零狀態結束，完整保留錯誤。`--prompt-version 1` 可比對舊提示，`--repeat 3` 可重複量測；其他系統須用 `--font` 指定可顯示繁體中文的 TTF / TTC 字型。這是選擇性模型實測，不是 CI mock 測試，三份乾淨合成圖也不代表真實收據全面驗收。
