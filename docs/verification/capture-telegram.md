@@ -39,4 +39,6 @@
 - 商家預設規則、每日摘要與主動排程通知未交付，Phase 2 未整體標 DONE。正式備份目的地仍沿用本機 data/backups，外接目的地待使用者指定。
 - 既有 Starlette TestClient deprecation warning 與 Vite 主 bundle 大小警告仍保留；沒有放寬驗證條件。
 
-部署與 GitHub CI 狀態以本次交付紀錄及對應 commit run 為準。
+正式部署已完成 0003 → 0004 遷移，升級前後各完成一份本機備份，財務指紋一致；API／Web／DB 健康，capture-bridge 依使用者選擇未啟用。
+
+GitHub 首次檢查的後端與前端步驟通過；瀏覽器 fixture 因 CI 缺少 `PYTHONPATH` 失敗。已為該步驟明確指定 backend 匯入路徑並重新提交；最終 CI 結果以對應 commit run 為準。
