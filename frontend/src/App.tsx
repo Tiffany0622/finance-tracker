@@ -3,6 +3,7 @@ import { ArrowRight, Check, ChevronRight, Database, FileClock, LayoutDashboard, 
 import { api, ApiError, prepareCsrf } from './api/client';
 import type { components } from './api/schema';
 import { CaptureWorkspace } from './CaptureWorkspace';
+import { ProductHistory } from './ProductHistory';
 import { FinanceWorkspace } from './FinanceWorkspace';
 import { Button } from './components/ui/button';
 type User = components['schemas']['UserOutput'];
@@ -44,6 +45,7 @@ export function App() {
         <button aria-current={tab === 'accounts' ? 'page' : undefined} onClick={() => setTab('accounts')}><Wallet size={19}/>帳戶</button>
         <button aria-current={tab === 'transactions' ? 'page' : undefined} onClick={() => setTab('transactions')}><FileClock size={19}/>記帳</button>
         <button aria-current={tab === 'capture' ? 'page' : undefined} onClick={() => setTab('capture')}><FileClock size={19}/>收據草稿</button>
+        <button aria-current={tab === 'products' ? 'page' : undefined} onClick={() => setTab('products')}><FileClock size={19}/>商品紀錄</button>
         <button aria-current={tab === 'system' ? 'page' : undefined} onClick={() => setTab('system')}><Database size={19}/>系統狀態</button>
         <button aria-current={tab === 'settings' ? 'page' : undefined} onClick={() => setTab('settings')}><Settings2 size={19}/>偏好設定</button>
         <button aria-current={tab === 'security' ? 'page' : undefined} onClick={() => setTab('security')}><ShieldCheck size={19}/>帳號安全</button>
@@ -51,7 +53,7 @@ export function App() {
       <div className="sidebar-bottom"><span className="local-dot"/>帳本保存在這台電腦<p>自己的資料，自己掌握。</p></div>
     </aside>
     <div className="main-shell">
-      <header className="topbar"><span><span className="muted">我的空間</span><ChevronRight size={14}/>{{overview:'總覽',accounts:'帳戶',transactions:'記帳',capture:'收據草稿',system:'系統狀態',settings:'偏好設定',security:'帳號安全'}[tab]}</span><button onClick={logout} className="logout"><LogOut size={16}/>登出</button></header>
+      <header className="topbar"><span><span className="muted">我的空間</span><ChevronRight size={14}/>{{overview:'總覽',accounts:'帳戶',transactions:'記帳',capture:'收據草稿',products:'商品紀錄',system:'系統狀態',settings:'偏好設定',security:'帳號安全'}[tab]}</span><button onClick={logout} className="logout"><LogOut size={16}/>登出</button></header>
       <main className="content">
         {error && <div className="alert" role="alert">{error}<button onClick={load}>重新連線</button></div>}
         {['overview','accounts','transactions'].includes(tab) && user.settings.setup_completed && <FinanceWorkspace tab={tab} currency={user.settings.book_currency!} timezone={user.settings.timezone!}/>}
@@ -67,6 +69,7 @@ export function App() {
           <div className="lower-grid"><section className="panel"><div className="section-heading"><h2>接下來的功能</h2><span>尚未啟用</span></div>{[['01','週期記帳與帳戶對帳','後續 Phase 1 工作'],['02','Numbers XLSX 與 PDF','Phase 1.5 報表檔案'],['03','Telegram 快速記帳','Phase 2 收據與文字記錄']].map(([number,title,desc]) => <div className="roadmap" key={number}><span>{number}</span><div><h3>{title}</h3><p>{desc}</p></div><LockKeyhole size={15}/></div>)}</section>
           <section className="panel"><h2>系統檢查</h2><p className="muted">確認背景工作能排入並完成。</p><Probe/><div className="system-detail"><span>待處理工作</span><strong>{status?.jobs_pending ?? '—'}</strong></div><div className="system-detail"><span>失敗工作</span><strong>{status?.jobs_failed ?? '—'}</strong></div><div className="system-detail"><span>可用空間</span><strong>{status ? `${(status.disk_free_bytes / 1024 ** 3).toFixed(1)} GB` : '—'}</strong></div>{status?.disk_low && <p className="error">磁碟剩餘空間不足 1 GB。</p>}<p className="footnote">辨識與 Telegram 設定狀態可在「收據草稿」查看；Notion 尚未啟用。</p></section></div>
         </>}
+        {tab === 'products' && <ProductHistory currency={user.settings.book_currency||'USD'} onCapture={()=>setTab('capture')}/>}
         {tab === 'capture' && (user.settings.setup_completed ? <CaptureWorkspace currency={user.settings.book_currency!}/> : <p className="form-hint">請先完成偏好設定，再建立收據草稿。</p>)}
         {tab === 'settings' && <Preferences user={user} onSave={load}/>}
         {tab === 'security' && <Security enabled={user.totp_enabled} onChange={load}/>}

@@ -57,3 +57,23 @@
 .capture-editor{width:min(1060px,94vw);max-width:1060px}.capture-editor-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:28px}.capture-evidence{min-width:0}.capture-preview{width:100%;max-height:600px;object-fit:contain;border-radius:12px;background:#f1f3ed}
 .capture-editor fieldset{margin:0;padding:0;border:0;min-width:0}.capture-item{display:flex;justify-content:space-between;gap:15px;border-bottom:1px solid #dde3d9;padding:10px 0;font-size:13px}.capture-item small{display:block;color:#738076}.capture-warnings{background:#fff8e9;border:1px solid #eadab4;border-radius:10px;padding:16px;margin-top:20px;font-size:13px;overflow-wrap:anywhere}.capture-warnings ul{padding-left:20px}.capture-warnings li{margin:6px 0}
 @media(max-width:760px){.capture-inputs,.capture-editor-grid{grid-template-columns:1fr}.capture-inputs{gap:16px}.capture-preview{max-height:300px}.draft-card{padding:14px;gap:10px}.draft-icon{display:none}.draft-amount{font-size:13px}.capture-status{gap:10px}.capture-editor{width:96vw}}
+
+/* Reviewed receipt items and purchase history share the ledger's visual language. */
+@media (min-width: 761px) { .capture-evidence { position: sticky; top: 16px; align-self: start; max-height: calc(90dvh - 32px); overflow: auto; } }
+.item-review { border-top: 1px solid var(--line, #e3e5df); margin-top: 24px; padding-top: 20px; }
+.item-review h3, .purchase-card h3 { margin: 0; overflow-wrap: anywhere; }
+.item-edit-list { display: grid; gap: 12px; margin-bottom: 14px; }
+.item-edit-card { background: #f6f7f3; border: 1px solid #e3e5df; border-radius: 12px; padding: 14px; min-width: 0; }
+.item-edit-card .section-heading { margin: 0 0 8px; }
+.item-ack { margin: 16px 0; }
+.item-review .footnote, .purchase-card p { overflow-wrap: anywhere; }
+.product-search { display: flex; align-items: end; gap: 12px; }
+.product-search label { flex: 1; margin: 0; min-width: 0; }
+.product-search button { flex-shrink: 0; }
+.purchase-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.purchase-card { min-width: 0; }
+.purchase-card .section-heading { align-items: start; margin-top: 0; gap: 12px; }
+.purchase-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
+.purchase-values dt { color: #6c756e; font-size: 12px; margin-bottom: 6px; }
+.purchase-values dd { margin: 0; font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
+@media (max-width: 700px) { .purchase-list { grid-template-columns: 1fr; } .product-search { align-items: stretch; flex-direction: column; } }

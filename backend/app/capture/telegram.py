@@ -334,6 +334,37 @@ def command(db: Session, owner: uuid.UUID, update: TelegramUpdate, key: str, req
                 f"{label}：{metric.get('value') if metric.get('value') is not None else '資料不足'}"
             )
         send(db, owner, chat, key, "\n".join(lines))
+    elif name == "/lookup":
+        from app.capture.items import search
+
+        query = update.text.partition(" ")[2].strip()
+        if not query or len(query) > 200 or update.file_id:
+            send(
+                db,
+                owner,
+                chat,
+                key,
+                "請輸入 /lookup 商品關鍵字，例如 /lookup 蘋果。照片搜尋尚未開放；這次查詢不會建立記帳草稿。",
+            )
+            return
+        result = search(db, owner, query, 0, 5)
+        lines = ["歷史商品 · 已核對且已入帳的支出（不限日期／商店）"]
+        for item in result.items:
+            lines.append(
+                f"\n{item.occurred_on} · {item.merchant[:100] or '未填商家'}\n"
+                f"{item.name[:150]}\n{item.quantity if item.quantity is not None else '數量不明'} {item.unit[:40]} · "
+                f"單價 {item.unit_price if item.unit_price is not None else '不明'} · "
+                f"列金額 {item.line_total if item.line_total is not None else '不明'} {item.currency}\n"
+                f"收據 {str(item.draft_id)[:8]}"
+            )
+        if not result.items:
+            lines.append("沒有符合的已核對商品。可到網頁核對舊收據，或換用收據原文搜尋。")
+        if result.has_more:
+            lines.append("僅顯示最近 5 項，完整結果請到網頁「商品紀錄」。")
+        if result.pending_receipts:
+            lines.append(f"另有 {result.pending_receipts} 份已入帳收據尚待品項核對。")
+        lines.append("價格依收據品項記錄，稅／小費未另行分攤；退款未抵扣。")
+        send(db, owner, chat, key, "\n".join(lines))
     elif name == "/budget":
         send(db, owner, chat, key, "預算功能尚未實作（Phase 3）。")
     else:
@@ -342,7 +373,7 @@ def command(db: Session, owner: uuid.UUID, update: TelegramUpdate, key: str, req
             owner,
             chat,
             key,
-            '傳送收據照片或記帳文字，即可建立草稿。\n/pending 待確認草稿，可用按鈕選幣別、帳戶、分類或重新辨識\n/today 今日收支\n/month 本月收支\n/networth 淨資產\n/edit 草稿編號 amount=金額 date=YYYY-MM-DD currency=USD merchant="商家"\n照片辨識不會自動入帳，請核對後按確認。',
+            '傳送收據照片或記帳文字，即可建立草稿。\n/pending 待確認草稿，可用按鈕選幣別、帳戶、分類或重新辨識\n/lookup 商品關鍵字：查詢已核對的購買紀錄\n/today 今日收支\n/month 本月收支\n/networth 淨資產\n/edit 草稿編號 amount=金額 date=YYYY-MM-DD currency=USD merchant="商家"\n照片辨識不會自動入帳，請核對後按確認。品項修正請在網頁「收據草稿」操作。',
         )
 
 
@@ -384,6 +415,8 @@ def ingest(
         else:
             if update.callback:
                 callback(db, owner, update.callback, key, request, update.chat_id)
+            elif update.text.split() and update.text.split()[0].split("@")[0].lower() == "/lookup":
+                command(db, owner, update, key, request)
             elif update.file_id:
                 row = service.new_draft(
                     db,

@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 import path from 'node:path';
 
-test('receipt draft stays unposted until reviewed, survives reload and confirms once', async ({page},info)=>{
+test('receipt items survive review, confirm once, search history and correct posted prices', async ({page},info)=>{
   const name=`草稿測試-${info.project.name}-${Date.now()}`;
   await page.goto('/');
   await page.getByLabel('帳號',{exact:true}).fill('alice');
@@ -21,6 +21,7 @@ test('receipt draft stays unposted until reviewed, survives reload and confirms 
   await page.getByRole('button',{name:'上傳並建立草稿'}).click();
   const dialog=page.getByRole('dialog',{name:'核對收據草稿'});
   await expect(dialog.getByRole('img',{name:'收據預覽'})).toBeVisible();
+  await expect(dialog.getByRole('button',{name:'新增品項'})).toBeDisabled();
   await dialog.getByRole('combobox',{name:'收據幣別',exact:true}).selectOption('USD');
   await dialog.getByLabel('金額',{exact:true}).fill('10');
   await dialog.getByLabel('帳務日期').fill('2026-01-05');
@@ -30,8 +31,23 @@ test('receipt draft stays unposted until reviewed, survives reload and confirms 
   await expect(dialog.getByRole('button',{name:'確認入帳',exact:true})).toBeDisabled();
   await dialog.getByRole('button',{name:'儲存草稿修改'}).click();
   await expect(dialog.getByText('草稿已儲存，請核對後確認入帳。')).toBeVisible();
+  await dialog.getByRole('button',{name:'新增品項'}).click();
+  await dialog.getByLabel('品名 1',{exact:true}).fill(`牛奶 ${name}`);
+  await dialog.getByLabel('數量 1',{exact:true}).fill('2');
+  await dialog.getByLabel('單位／規格 1',{exact:true}).fill('瓶／1L');
+  await dialog.getByLabel('單價 1',{exact:true}).fill('5');
+  await dialog.getByLabel('列金額 1',{exact:true}).fill('10');
+  await expect(dialog.getByRole('button',{name:'確認入帳',exact:true})).toBeDisabled();
+  page.once('dialog',d=>void d.dismiss());
+  await dialog.getByRole('button',{name:'關閉草稿'}).click();
+  await expect(dialog.getByLabel('品名 1',{exact:true})).toHaveValue(`牛奶 ${name}`);
+  await dialog.getByLabel('我已逐項核對原收據；不確定的數值已留白').check();
+  await dialog.getByRole('button',{name:'儲存已核對品項'}).click();
+  await expect(dialog.getByText('品項已核對；確認入帳後即可在「商品紀錄」搜尋。')).toBeVisible();
   const accountsBefore=await (await page.request.get('/api/v1/accounts')).json();
   expect(accountsBefore.find((a:{id:string})=>a.id===account.id).balance).toBe('50');
+  const historyBefore=await (await page.request.get('/api/v1/products/history?q='+encodeURIComponent(name))).json();
+  expect(historyBefore.items).toHaveLength(0);
   await dialog.getByRole('button',{name:'關閉草稿'}).click();
   await page.reload();
   await page.getByRole('button',{name:'收據草稿',exact:true}).click();
@@ -51,4 +67,34 @@ test('receipt draft stays unposted until reviewed, survives reload and confirms 
   expect(accountsAfter.find((a:{id:string})=>a.id===account.id).balance).toBe('40');
   const attached=await (await page.request.get(`/api/v1/transactions/${row.confirmed_transaction_id}/attachments`)).json();
   expect(attached).toHaveLength(1);
+  await dialog.getByRole('button',{name:'關閉草稿'}).click();
+  await page.getByRole('button',{name:'商品紀錄',exact:true}).click();
+  await page.getByLabel('搜尋商品',{exact:true}).fill(name);
+  await page.getByRole('button',{name:'搜尋',exact:true}).click();
+  await expect(page.locator('.purchase-card')).toHaveCount(1);
+  await expect(page.locator('.purchase-card').getByRole('heading',{name:`牛奶 ${name}`})).toBeVisible();
+  await page.getByRole('button',{name:'查看收據／修正品項'}).click();
+  await expect(dialog.getByRole('img',{name:'收據預覽'})).toBeVisible();
+  await dialog.getByLabel('品名 1',{exact:true}).fill(`燕麥奶 ${name}`);
+  await dialog.getByLabel('單價 1',{exact:true}).fill('4.5');
+  await dialog.getByLabel('列金額 1',{exact:true}).fill('9');
+  await dialog.getByLabel('品項備註 1',{exact:true}).fill('合成折扣核對');
+  await dialog.getByLabel('我已逐項核對原收據；不確定的數值已留白').check();
+  await dialog.getByRole('button',{name:'儲存已核對品項'}).click();
+  await expect(dialog.getByText('品項已核對，可到「商品紀錄」搜尋。帳務金額未改動。')).toBeVisible();
+  expect(await dialog.evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(false);
+  await dialog.locator('.item-review').scrollIntoViewIfNeeded();
+  await page.screenshot({path:info.outputPath('item-review.png')});
+  await dialog.getByRole('button',{name:'關閉草稿'}).click();
+  await expect(page.locator('.purchase-card').getByRole('heading',{name:`燕麥奶 ${name}`})).toBeVisible();
+  await expect(page.locator('.purchase-card').getByText('4.5',{exact:true})).toBeVisible();
+  const afterCorrection=await (await page.request.get('/api/v1/accounts')).json();
+  expect(afterCorrection.find((a:{id:string})=>a.id===account.id).balance).toBe('40');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth)).toBe(false);
+  await page.screenshot({path:info.outputPath('product-history.png'),fullPage:true});
+  await page.reload();
+  await page.getByRole('button',{name:'商品紀錄',exact:true}).click();
+  await page.getByLabel('搜尋商品',{exact:true}).fill(`燕麥奶 ${name}`);
+  await page.getByRole('button',{name:'搜尋',exact:true}).click();
+  await expect(page.locator('.purchase-card')).toHaveCount(1);
 });

@@ -316,3 +316,13 @@ Web 與 Bot 共用草稿、保存圖片與 ledger service；AI 只輸出型別�
 待確認卡片顯示原始小計／稅／小費／折扣，未知顯示「不明」，明確零值保留；與人工修正後的記帳金額分開標示。幣別按鈕明確選 USD / TWD，只修改 proposal.currency，不換算金額、不變更帳戶或原始 parsed。關閉草稿不提供修改按鈕；處理中僅提供查看進度與取消，完成後另發可核對卡片。
 
 Bot 的重新辨識／下載重試與 Web 共用 `service.retry_draft()`。Bot 先顯示重試影響，使用者按「確定」才建立新工作；兩次按鈕均核對 owner 與 draft revision。舊按鈕不能蓋掉中間的人工編輯，重複 update 不重做，處理中的工作不另外排程。未啟用 AI 時不提供重新辨識，但仍可重試尚未保存的照片下載。原始圖片與歷程保留，沒有自動確認入帳或更動已入帳交易。
+
+### 品項核對 → 商品紀錄（2026-09-25）
+
+新增 `capture.items` 共用服務與 `0005_items` 遷移。AI 原始 `parsed` / parse attempt 不改寫；人工核對以 append-only review + item rows 保存原始解析快照、來源列、修正值與版本。每次寫入取得 maintenance shared lock 與 owner BookSettings lock，同時核對 draft、item review、正式交易 revision；舊畫面不能覆蓋新值。
+
+未入帳的已核對品項只保存在草稿。使用者確認整筆入帳時，僅將仍有效的核對版本複製至該筆交易 revision，不另外增加 posting。人工更正品項也不呼叫 ledger 寫入。草稿修改、重辨識或正式交易修訂會使舊核對失效，但仍保留人工值供再核對；作廢／取消來源不可再核對。舊收據 GET 只顯示 AI 候選，不批次將它們標成已核對。
+
+`GET/PUT /api/v1/capture/drafts/{id}/items` 是核對契約，`GET /api/v1/products/history?q=&offset=` 每頁 25 列，依購買日期倒序。查詢以 owner、有效支出、最新有效核對版本限制來源，再以不分英文大小寫的字面 substring 比對修正品名與原文（跳脫 `%`、`_`、`\`）。日期／商店不預限；未核對舊收據數量另外提醒。Web 可返回同一收據原圖與編輯器；Bot `/lookup` 共用查詢、最多 5 列，更多結果在 Web。附照片的 `/lookup` 只說明尚未支援，不誤建記帳草稿。
+
+新表納入備份 row counts、內容指紋與隔離還原驗證，保留舊 0003 / 0004 備份的對應驗證方式。API／worker schema gate 更新至 0005。沒有新增外部服務、模型或依賴；大資料量搜尋 p95 仍待專項量測。

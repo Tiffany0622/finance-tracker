@@ -335,3 +335,13 @@ ReportSnapshot 以不可變 JSON document 保存完整 metadata／指標／明�
 - 未入帳照片由 receipt_attachments 持有；確認時同一交易設 receipt.transaction_id 並建立 transaction_attachments。GC 仍檢查所有引用與 24 小時保留期。備份新增草稿、parse attempts、Telegram inbox / cursor 指紋，允許有草稿引用而尚未有 transaction 的收據。0001 / 0002 / 0003 備份仍可驗證與隔離還原。
 
 2026-09-25 Telegram 核對按鈕沿用上述 schema：幣別選擇寫 proposal 並增加 revision，原始 parsed 與 receipt_parse_attempts 不改。重試確認以 callback 內的 revision 防止舊卡片覆蓋修改，實際重試新增具唯一 logical_key 的工作；不新增臨時確認表或改寫既有工作／歷程。資料庫版本保持 0004_capture。
+
+## 2026-09-25：Schema 0005_items 實際交付
+
+此為上方 Phase 5 概念模型的提前子集，尚未建立 product master / alias / normalized prices：
+
+- `receipt_item_reviews`：owner、draft_id、revision（草稿內唯一）、draft_revision、transaction_revision（未入帳為 NULL）、currency、parsed_snapshot、建立時間。只新增版本，DB trigger 禁止 UPDATE / DELETE。最新版本與來源 draft／transaction revision 均吻合才算有效。
+- `receipt_items`：owner、review_id、line_no（版本內唯一，1–200）、source_line_no（可空）、不可偽改的 raw_name、人工 name、quantity／unit_price／line_total（Numeric(38,18)，可空）、unit（自由填寫規格，不當作已換算單位）、note。來源原文由伺服器從該核對版本的解析快照取值；手動新增列沒有 AI 原文。亦禁止 UPDATE / DELETE。
+- quantity 已知時 > 0；unit_price 已知時 >= 0；line_total 允許負值記錄獨立折扣列。空值不補零。API 以十進位字串輸入／輸出，金額不用 float。逐項數量 × 單價、明細與 AI 小計不符會提示，不擅自更改整筆帳務。
+- 未入帳核對與確認入帳皆保存版本。confirmation 只沿用來源未變且幣別一致的核對，並寫入正式 transaction revision；不建立第二份費用／posting。之後修訂正式帳務，舊核對暫不搜尋，直到再次人工核對。
+- 舊收據不批次回填為已確認商品；API 以既有 parsed 顯示候選，第一次核對才新增資料列。重辨識不清除先前修正與來源快照。所有新表採 owner 外鍵及複合關聯；納入正式備份與還原指紋。

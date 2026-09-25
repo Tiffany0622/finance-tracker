@@ -466,6 +466,49 @@ class ReceiptParseAttempt(Owned, Base):
     )
 
 
+class ReceiptItemReview(Owned, Base):
+    __tablename__ = "receipt_item_reviews"
+    draft_id: Mapped[uuid.UUID]
+    revision: Mapped[int]
+    draft_revision: Mapped[int]
+    transaction_revision: Mapped[int | None]
+    currency: Mapped[str] = mapped_column(ForeignKey("currencies.code"))
+    parsed_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    __table_args__ = (
+        UniqueConstraint("owner_id", "id"),
+        UniqueConstraint("draft_id", "revision"),
+        ForeignKeyConstraint(
+            ["owner_id", "draft_id"], ["capture_drafts.owner_id", "capture_drafts.id"]
+        ),
+        CheckConstraint("revision > 0 AND draft_revision > 0"),
+        CheckConstraint("transaction_revision IS NULL OR transaction_revision > 0"),
+    )
+
+
+class ReceiptItem(Owned, Base):
+    __tablename__ = "receipt_items"
+    review_id: Mapped[uuid.UUID]
+    line_no: Mapped[int]
+    source_line_no: Mapped[int | None]
+    raw_name: Mapped[str]
+    name: Mapped[str] = mapped_column(String(500))
+    quantity: Mapped[Decimal | None] = mapped_column(Numeric(38, 18))
+    unit_price: Mapped[Decimal | None] = mapped_column(Numeric(38, 18))
+    line_total: Mapped[Decimal | None] = mapped_column(Numeric(38, 18))
+    unit: Mapped[str] = mapped_column(String(40))
+    note: Mapped[str] = mapped_column(String(500))
+    __table_args__ = (
+        UniqueConstraint("review_id", "line_no"),
+        ForeignKeyConstraint(
+            ["owner_id", "review_id"], ["receipt_item_reviews.owner_id", "receipt_item_reviews.id"]
+        ),
+        CheckConstraint("line_no BETWEEN 1 AND 200"),
+        CheckConstraint("source_line_no IS NULL OR source_line_no BETWEEN 1 AND 200"),
+        CheckConstraint("quantity IS NULL OR quantity > 0"),
+        CheckConstraint("unit_price IS NULL OR unit_price >= 0"),
+    )
+
+
 class TelegramEvent(Owned, Base):
     __tablename__ = "telegram_events"
     bot_id: Mapped[int] = mapped_column(BigInteger)

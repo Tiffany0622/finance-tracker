@@ -31,6 +31,12 @@
 
 **預設尚未啟用外部整合**，不會在未選定 provider 或填入 Bot Token 時傳送照片。先完成程式，之後依 [啟用步驟](docs/capture-setup.md) 在本機設定；不要把金鑰貼到聊天。實作範圍與驗證邊界見 [辨識與 Telegram 驗證](docs/verification/capture-telegram.md)。
 
+## 品項核對與商品紀錄
+
+「收據草稿」先儲存帳務欄位，再於「品項核對／修正」增刪或修正品名、數量、單價、列金額與規格；未知留白。儲存已核對品項並確認入帳後，就能在「商品紀錄」搜尋全部日期與商店的購買紀錄，或傳 Telegram `/lookup 商品關鍵字` 查最近 5 項。
+
+舊收據可勾「包含已入帳與已取消」後開啟補核對。原始辨識與歷次修正保留，商品明細不增加第二筆支出；帳務修訂後須重新核對。搜尋目前比對修正品名與原文，尚無多語同義詞、照片搜尋或規格換算。操作與限制見 [啟用／使用步驟](docs/capture-setup.md)，驗證見 [品項功能紀錄](docs/verification/receipt-items.md)。
+
 ## 啟動本機系統
 
 需要已啟動的 Docker 引擎與 現行 Docker Compose（docker compose 指令）。Mac 可使用 Docker Desktop 或 OrbStack。首次建置需網路下載鎖定的映像與依賴；核心執行不需 AI、Telegram 或 Notion 金鑰。

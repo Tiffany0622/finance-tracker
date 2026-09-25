@@ -231,6 +231,9 @@ def confirm(
     row.confirmed_transaction_id = identity_tx
     row.revision += 1
     audit(db, owner, "capture.confirm", str(row.id), request)
+    from app.capture.items import carry_review_to_posted
+
+    carry_review_to_posted(db, row, row.revision - 1)
     return row
 
 

@@ -38,18 +38,25 @@ BACKUP_TABLES = (
     )
     + ATTACHMENT_TABLES
     + ("capture_drafts", "receipt_parse_attempts", "telegram_events", "telegram_cursors")
+    + ("receipt_item_reviews", "receipt_items")
 )
 
 
-def attachment_fingerprint(conn: Any, data_dir: Path, legacy: bool = False) -> str:
+def attachment_fingerprint(
+    conn: Any, data_dir: Path, legacy: bool = False, capture_only: bool = False
+) -> str:
     from app.receipts.service import file_path
 
     conn.execute(text("SET LOCAL timezone TO 'UTC'"))
     digest = hashlib.sha256()
-    for table in ATTACHMENT_TABLES + (
-        ()
-        if legacy
-        else ("capture_drafts", "receipt_parse_attempts", "telegram_events", "telegram_cursors")
+    for table in (
+        ATTACHMENT_TABLES
+        + (
+            ()
+            if legacy
+            else ("capture_drafts", "receipt_parse_attempts", "telegram_events", "telegram_cursors")
+        )
+        + (() if legacy or capture_only else ("receipt_item_reviews", "receipt_items"))
     ):
         for row in conn.execute(
             text(f'SELECT row_to_json(t)::text FROM "{table}" t ORDER BY row_to_json(t)::text')
@@ -154,6 +161,7 @@ def verify_backup(path: Path) -> dict[str, Any]:
         "0001_phase0",
         "0002_ledger",
         "0003_receipts",
+        "0004_capture",
         SCHEMA_VERSION,
     ):
         raise ValueError("backup_version_unsupported")
@@ -393,14 +401,19 @@ def restore_backup(source: Path, target_url: str, target_data: Path) -> None:
             if manifest["schema_version"] in (
                 "0002_ledger",
                 "0003_receipts",
+                "0004_capture",
                 SCHEMA_VERSION,
             ) and financial_fingerprint(conn) != manifest.get("financial_hash"):
                 raise ValueError("restored_financial_mismatch")
             if manifest["schema_version"] in (
                 "0003_receipts",
+                "0004_capture",
                 SCHEMA_VERSION,
             ) and attachment_fingerprint(
-                conn, target_data, legacy=manifest["schema_version"] == "0003_receipts"
+                conn,
+                target_data,
+                legacy=manifest["schema_version"] == "0003_receipts",
+                capture_only=manifest["schema_version"] == "0004_capture",
             ) != manifest.get("attachment_hash"):
                 raise ValueError("restored_attachment_metadata_mismatch")
         for name, expected in manifest["files"].items():

@@ -571,8 +571,22 @@ def test_backup_restore_preserves_unposted_receipt_and_parse_history(
     headers = auth()
     row = image(logged_in)
     complete(logged_in, headers, next_job(logged_in, headers), parsed=PARSED)
+    row = edit(logged_in, get_draft(logged_in, row), currency="USD")
+    state = logged_in.get(f"/api/v1/capture/drafts/{row['id']}/items").json()
+    reviewed = logged_in.put(
+        f"/api/v1/capture/drafts/{row['id']}/items",
+        json={
+            "expected_revision": 0,
+            "expected_draft_revision": row["revision"],
+            "acknowledged": True,
+            "items": [{k: v for k, v in i.items() if k != "raw_name"} for i in state["items"]],
+        },
+    )
+    assert reviewed.status_code == 200, reviewed.text
     backup = create_backup()
     manifest = verify_backup(backup)
+    assert manifest["counts"]["receipt_item_reviews"] == 1
+    assert manifest["counts"]["receipt_items"] == 2
     assert (
         manifest["counts"]["capture_drafts"] == 1
         and manifest["counts"]["receipt_parse_attempts"] == 1
@@ -592,6 +606,10 @@ def test_backup_restore_preserves_unposted_receipt_and_parse_history(
         with Session(restored) as db:
             draft = db.get(CaptureDraft, uuid.UUID(row["id"]))
             assert draft.status == "needs_review" and draft.parsed["amount"] == "10.50"
+            from app.capture.items import review_output
+
+            assert review_output(db, draft).status == "reviewed"
+            assert review_output(db, draft).items[0].raw_name == "蘋果 Apples"
             assert (
                 db.scalar(
                     select(func.count())
