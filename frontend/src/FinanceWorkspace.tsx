@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowDownUp, Plus, Download, CreditCard, Landmark, Wallet, RefreshCw, X, Pencil, CornerUpLeft } from 'lucide-react';
 import type { components } from './api/schema';
 import { api } from './api/client';
+import { useSubmitKey } from './api/useSubmitKey';
+import { Modal } from './components/Modal';
+import { CategoryForm } from './components/CategoryForm';
 import { Button } from './components/ui/button';
 import { ReportChart } from './components/ReportChart';
 import { ReceiptManager } from './components/ReceiptManager';
@@ -28,15 +31,6 @@ function todayIn(zone:string) {
   return ['year','month','day'].map(type=>parts.find(p=>p.type===type)!.value).join('-');
 }
 const dayAfter = (day:string) => {const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+1);return d.toISOString().slice(0,10);};
-function useSubmitKey() {
-  const last = useRef({body:'',key:''});
-  return (body:unknown) => {const encoded=JSON.stringify(body);if(last.current.body!==encoded)last.current={body:encoded,key:crypto.randomUUID()};return last.current.key;};
-}
-function Modal({title,children,onClose,busy=false}:{title:string;children:ReactNode;onClose:()=>void;busy?:boolean}) {
-  const ref=useRef<HTMLDialogElement>(null);
-  useEffect(()=>{const node=ref.current;node?.showModal();return()=>node?.close();},[]);
-  return <dialog ref={ref} className="finance-dialog" aria-label={title} onCancel={e=>{e.preventDefault();if(!busy)onClose();}}><div className="dialog-heading"><h2>{title}</h2><button aria-label="關閉" onClick={onClose} disabled={busy}><X size={21}/></button></div>{children}</dialog>;
-}
 export function FinanceWorkspace({tab,currency,timezone}:{tab:string;currency:string;timezone:string}) {
   const today=todayIn(timezone);
   const [start,setStart]=useState(today.slice(0,8)+'01'),[end,setEnd]=useState(today);
@@ -148,11 +142,6 @@ function TransactionForm({txn,refund,accounts,categories,currency,today,onClose,
     {kind==='transfer'&&<><label>轉入帳戶<select required value={to} onChange={e=>setTo(e.target.value)}><option value="">請選擇</option>{accounts.filter(a=>!a.archived&&a.id!==account).map(a=><option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select></label>{cross&&<><label>實際轉入金額（{destination?.currency}）<input name="received" required inputMode="decimal" defaultValue={txn?.received_amount??''}/></label>{destination?.currency!==currency&&<label>轉入匯率（1 {destination?.currency} = 多少 {currency}）<input name="receivedfx" required inputMode="decimal" defaultValue={txn?.received_fx_rate??''}/></label>}</>}<div className="form-grid"><label>手續費（{source?.currency}）<input name="fee" inputMode="decimal" defaultValue={txn?.fee??'0'}/></label><label>手續費分類<select name="feecategory" defaultValue={txn?.fee_category_id??''}><option value="">無費用可留空</option>{categories.filter(c=>c.kind==='expense').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label></div><p className="footnote">轉帳本金及信用卡還款不計支出；手續費單獨計入。</p></>}
     {['income','expense'].includes(kind)&&<><div className="section-heading compact"><h3>分類{split.length>1?'分攤':''}</h3><button type="button" className="text-button" onClick={onCategory}>新增分類</button></div>{split.map((s,i)=><div key={i} className="split-row"><label>分類 {split.length>1?i+1:''}<select required value={s.category_id} onChange={e=>setSplit(v=>v.map((item,j)=>j===i?{...item,category_id:e.target.value}:item))}><option value="">請選擇分類</option>{available.map(c=><option key={c.id} value={c.id}>{c.parent_id?'↳ ':''}{c.name}</option>)}</select></label>{split.length>1&&<><label>分攤金額<input required inputMode="decimal" value={s.amount} onChange={e=>setSplit(v=>v.map((item,j)=>j===i?{...item,amount:e.target.value}:item))}/></label><button type="button" aria-label={`移除分攤${i+1}`} onClick={()=>setSplit(v=>v.filter((_,j)=>j!==i))}><X size={16}/></button></>}</div>)}<button className="text-button" type="button" onClick={()=>setSplit(v=>[...v,{category_id:'',amount:''}])} disabled={split.length>=30}>＋ 加入分類分攤</button></>}
     <div className="form-grid"><label>商家<input name="merchant" maxLength={200} defaultValue={txn?.merchant??refund?.merchant}/></label><label>標籤（逗號分隔）<input name="tags" defaultValue={txn?.tags.join(', ')} placeholder="旅遊, 報帳"/></label></div><label>備註<textarea name="note" rows={2} maxLength={2000} defaultValue={txn?.note}/></label><p className="footnote">收據照片可在入帳後，從交易列的「收據」上傳。</p>{txn&&<label>更正原因<input name="reason" required maxLength={500}/></label>}{error&&<p role="alert" className="error">{error}</p>}<div className="form-actions"><Button variant="secondary" type="button" onClick={onClose} disabled={busy}>取消</Button><Button type="submit" disabled={busy}>{busy?'入帳中…':txn?'儲存更正':'確認入帳'}</Button></div></form></Modal>;
-}
-function CategoryForm({categories,onClose,onSave}:{categories:Category[];onClose:()=>void;onSave:()=>void|Promise<void>}) {
-  const [kind,setKind]=useState('expense'),[busy,setBusy]=useState(false),[error,setError]=useState('');const key=useSubmitKey();
-  async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();const f=new FormData(e.currentTarget);const body={name:f.get('name'),kind,parent_id:f.get('parent')||null};setBusy(true);setError('');try{await api('/categories',{method:'POST',headers:{'Idempotency-Key':key(body)},body:JSON.stringify(body)});await onSave();}catch(e){setError(message(e));}finally{setBusy(false);}}
-  return <Modal title="分類管理" onClose={onClose} busy={busy}><div className="category-chips">{categories.map(c=><span key={c.id}>{c.parent_id?'↳ ':''}{c.name} · {kinds[c.kind]}</span>)}</div><form onSubmit={submit}><label>分類名稱<input name="name" required maxLength={80}/></label><div className="form-grid"><label>收支類型<select value={kind} onChange={e=>setKind(e.target.value)}><option value="expense">支出</option><option value="income">收入</option></select></label><label>上層分類<select key={kind} name="parent"><option value="">無（建立主分類）</option>{categories.filter(c=>c.kind===kind&&!c.parent_id).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label></div>{error&&<p className="error" role="alert">{error}</p>}<div className="form-actions"><Button type="submit" disabled={busy}>儲存分類</Button></div></form></Modal>;
 }
 function VoidForm({txn,onClose,onSave}:{txn:Txn;onClose:()=>void;onSave:(text:string)=>void}) {
   const [busy,setBusy]=useState(false),[error,setError]=useState('');const key=useSubmitKey();

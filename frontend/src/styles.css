@@ -66,6 +66,7 @@
 .confirm-dialog { max-width: 480px; }
 .confirm-dialog p { margin-top: 16px; line-height: 1.7; }
 .confirm-dialog .form-actions { flex-wrap: wrap; }
+.receipt-split{margin-bottom:16px}.receipt-split .split-row label{min-width:0}.receipt-split>.text-button{font-size:12px}.receipt-split-add{display:inline-flex;align-items:center;gap:6px}
 @media (max-width: 760px) { .finance-dialog > .dialog-heading { top: -21px; margin: -21px -21px 0; padding: 14px 21px; } }
 @media (max-width: 600px) { .receipt-dialog > .dialog-heading { top: -20px; margin: -20px -20px 0; padding: 14px 20px; } }
 .item-review h3, .purchase-card h3 { margin: 0; overflow-wrap: anywhere; }
