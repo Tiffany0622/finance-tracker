@@ -3,6 +3,7 @@ import { Camera, FileText, RefreshCw, Plus, X, Check, Send } from 'lucide-react'
 import { api } from './api/client';
 import type { components } from './api/schema';
 import { ReceiptItemEditor } from './components/ReceiptItemEditor';
+import { ConfirmDialog } from './components/ConfirmDialog';
 import { Button } from './components/ui/button';
 
 type Draft = components['schemas']['DraftOutput'];
@@ -55,30 +56,32 @@ export function CaptureWorkspace({currency}:{currency:string}) {
     <div className="section-heading"><h2>待你核對</h2><label className="checkbox-label"><input type="checkbox" checked={closed} onChange={e=>{setClosed(e.target.checked);setPage(0);}}/>包含已入帳與已取消</label></div>
     {!rows.length?<section className="empty-state panel"><Camera size={32}/><h2>把收據留在這裡</h2><p>上傳照片或傳送 Telegram 訊息後，草稿會出現在這裡。</p></section>:<div className="draft-list">{rows.map(row=><button className="draft-card" key={row.id} onClick={()=>setSelected(row)}><span className="draft-icon"><FileText/></span><span><strong>{row.proposal.merchant||'尚未填寫商家'}</strong><small>{row.proposal.occurred_on||'日期待補'} · {row.source==='telegram'?'Telegram':'網頁'}</small></span><span className="draft-amount">{row.proposal.currency||'幣別待補'} {row.proposal.amount||'金額待補'}<small>{labels[row.status]}</small></span></button>)}</div>}
     <div className="form-actions"><Button variant="secondary" disabled={!page} onClick={()=>setPage(p=>p-1)}>上一頁</Button><span>第 {page+1} 頁</span><Button variant="secondary" disabled={rows.length<25} onClick={()=>setPage(p=>p+1)}>下一頁</Button></div>
-    {selected&&<DraftEditor key={selected.id} initial={selected} accounts={accounts} categories={categories} currency={currency} onClose={()=>setSelected(null)} onSaved={()=>void load()}/>}
+    {selected&&<DraftEditor key={selected.id} initial={selected} accounts={accounts} categories={categories} currency={currency} onClose={()=>setSelected(null)} onSaved={text=>{if(text)setNotice(text);void load();}}/>}
   </>;
 }
 
-export function DraftEditor({initial,accounts,categories,currency,onClose,onSaved}:{initial:Draft;accounts:Account[];categories:Category[];currency:string;onClose:()=>void;onSaved:()=>void}) {
+export function DraftEditor({initial,accounts,categories,currency,onClose,onSaved}:{initial:Draft;accounts:Account[];categories:Category[];currency:string;onClose:()=>void;onSaved:(notice?:string)=>void}) {
   const [draft,setDraft]=useState(initial),[proposal,setProposal]=useState<Proposal>(initial.proposal),[dirty,setDirty]=useState(false);
   const [error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[ack,setAck]=useState(false),[preview,setPreview]=useState('');
   const [cancelPrompt,setCancelPrompt]=useState(false);
   const [itemDirty,setItemDirty]=useState(false),[itemBusy,setItemBusy]=useState(false);
+  const [discard,setDiscard]=useState<'close'|'reload'|null>(null),[reloadVersion,setReloadVersion]=useState(0);
   const dialogRef=useRef<HTMLDialogElement>(null);
   const closed=['confirmed','cancelled'].includes(draft.status);
-  useEffect(()=>{const before=document.activeElement as HTMLElement|null;dialogRef.current?.showModal();return()=>{dialogRef.current?.close();before?.focus();};},[]);
+  useEffect(()=>{const node=dialogRef.current,before=document.activeElement as HTMLElement|null;node?.showModal();return()=>{node?.close();if(before?.isConnected)before.focus();};},[]);
   useEffect(()=>{if(!draft.attachment_id)return;let active=true;let url='';void api<Blob>(`/attachments/${draft.attachment_id}/preview`,{},true,'blob').then(blob=>{url=URL.createObjectURL(blob);if(active)setPreview(url);else URL.revokeObjectURL(url);}).catch(e=>{if(active)setError(message(e));});return()=>{active=false;if(url)URL.revokeObjectURL(url);};},[draft.attachment_id]);
   useEffect(()=>{if(draft.status!=='processing'||dirty)return;const timer=setInterval(()=>{void api<Draft>('/capture/drafts/'+draft.id).then(row=>{setDraft(row);setProposal(row.proposal);}).catch(e=>setError(message(e)));},2000);return()=>clearInterval(timer);},[draft.id,draft.status,dirty]);
   const change=<K extends keyof Proposal>(key:K,value:Proposal[K])=>{setProposal(p=>({...p,[key]:value}));setDirty(true);setAck(false);setNotice('');};
-  async function reload(){if((dirty||itemDirty)&&!window.confirm('重新載入會捨棄尚未儲存的修改，確定繼續？'))return;try{const row=await api<Draft>('/capture/drafts/'+draft.id);setDraft(row);setProposal(row.proposal);setDirty(false);setError('');setAck(false);}catch(e){setError(message(e));}}
+  async function reload(){setBusy(true);setError('');try{const row=await api<Draft>('/capture/drafts/'+draft.id);setDraft(row);setProposal(row.proposal);setDirty(false);setItemDirty(false);setReloadVersion(v=>v+1);setAck(false);setNotice('已重新載入已儲存的草稿與品項。');}catch(e){setError(message(e));}finally{setBusy(false);}}
   async function save(e:FormEvent){e.preventDefault();setBusy(true);setError('');try{const row=await api<Draft>('/capture/drafts/'+draft.id,{method:'PUT',body:JSON.stringify({expected_revision:draft.revision,proposal})});setDraft(row);setProposal(row.proposal);setDirty(false);setNotice('草稿已儲存，請核對後確認入帳。');onSaved();}catch(e){setError(message(e));}finally{setBusy(false);}}
   async function action(kind:'confirm'|'cancel'|'retry'){
     setBusy(true);setError('');setNotice('');
-    try{const row=await api<Draft>(`/capture/drafts/${draft.id}/${kind}`,{method:'POST',body:JSON.stringify({expected_revision:draft.revision,acknowledge_warnings:ack})});setDraft(row);setProposal(row.proposal);setDirty(false);setAck(false);setCancelPrompt(false);setNotice(kind==='confirm'?'已確認入帳，收據已附在交易上。':kind==='cancel'?'草稿已取消，沒有新增交易。':'已安排重新辨識。');onSaved();}catch(e){setError(message(e));}finally{setBusy(false);}
+    try{const row=await api<Draft>(`/capture/drafts/${draft.id}/${kind}`,{method:'POST',body:JSON.stringify({expected_revision:draft.revision,acknowledge_warnings:ack})});setDraft(row);setProposal(row.proposal);setDirty(false);setAck(false);setCancelPrompt(false);const text=kind==='confirm'?'已確認入帳，收據已附在交易上。':kind==='cancel'?'草稿已取消，沒有新增交易。':'已安排重新辨識。';setNotice(text);onSaved(text);if(kind!=='retry')onClose();}catch(e){setError(message(e));}finally{setBusy(false);}
   }
   const source=accounts.find(a=>a.id===proposal.account_id);
-  function close(){if(!busy&&!itemBusy&&(!(dirty||itemDirty)||window.confirm('有尚未儲存的修改，確定離開？')))onClose();}
-  return <dialog ref={dialogRef} className="finance-dialog capture-editor" aria-labelledby="draft-title" onCancel={e=>{e.preventDefault();close();}}><div className="dialog-heading"><h2 id="draft-title">核對收據草稿</h2><button aria-label="關閉草稿" disabled={busy||itemBusy} onClick={close}><X/></button></div>
+  function close(){if(busy||itemBusy)return;if(dirty||itemDirty)setDiscard('close');else onClose();}
+  return <><dialog ref={dialogRef} className="finance-dialog capture-editor" aria-labelledby="draft-title" onCancel={e=>{e.preventDefault();close();}}><div className="dialog-heading"><h2 id="draft-title">核對收據草稿</h2><button type="button" aria-label="關閉草稿" disabled={busy||itemBusy} onClick={close}><X/></button></div>
+    {(busy||itemBusy)&&<p role="status" className="form-hint">正在處理，請稍候。若連線逾時，會保留輸入並恢復關閉按鈕。</p>}
     <p className="muted">{labels[draft.status]} · {draft.id.slice(0,8)}{draft.job_status==='retry_wait'?' · 連線失敗，稍後重試':''}</p>
     <div className="capture-editor-grid"><div className="capture-evidence">{preview?<img className="capture-preview" src={preview} alt="收據預覽"/>:<p className="form-hint">{draft.attachment_id?'圖片載入中':'這份草稿沒有照片'}</p>}
     {draft.parsed&&<details><summary>原始辨識品項（{draft.parsed.items.length}）</summary><p className="footnote">保留辨識原文供核對，不會自動建立商品或分攤。</p>{draft.parsed.items.map((item,i)=><div className="capture-item" key={i}><span>{item.raw_name}<small>{item.quantity??'數量不明'} × {item.unit_price??'單價不明'}</small></span><strong>{item.line_total??'金額不明'}</strong></div>)}<p>小計 {draft.parsed.subtotal??'不明'} · 稅 {draft.parsed.tax??'不明'} · 小費 {draft.parsed.tip??'不明'} · 折扣 {draft.parsed.discount??'不明'}</p></details>}</div>
@@ -91,9 +94,10 @@ export function DraftEditor({initial,accounts,categories,currency,onClose,onSave
     <button type="button" className="text-button" disabled={(proposal.splits?.length??0)>=30} onClick={()=>{const splits=proposal.splits?.length?proposal.splits:[{category_id:proposal.category_id||'',amount:proposal.amount||'0'}];change('splits',[...splits,{category_id:'',amount:'0'}]);change('category_id',null);}}><Plus size={14}/>加入分類分攤</button>
     <label>商家<input maxLength={200} value={proposal.merchant} onChange={e=>change('merchant',e.target.value)}/></label><label>標籤（逗號分隔）<input value={(proposal.tags??[]).join(',')} onChange={e=>change('tags',e.target.value.split(',').filter(Boolean))}/></label><label>備註<textarea rows={2} maxLength={2000} value={proposal.note} onChange={e=>change('note',e.target.value)}/></label>
     {!closed&&<Button type="submit" disabled={busy||itemBusy||itemDirty||!dirty}>儲存草稿修改</Button>}</fieldset></form>
-    <ReceiptItemEditor draft={draft} disabled={busy||dirty} onDirty={setItemDirty} onBusy={setItemBusy}/>
+    <ReceiptItemEditor key={`${draft.id}:${reloadVersion}`} draft={draft} disabled={busy||dirty} onDirty={setItemDirty} onBusy={setItemBusy}/>
     {draft.warnings.length>0&&<div className="capture-warnings"><strong>請核對以下提醒</strong><ul>{draft.warnings.map((w,i)=><li key={i}>{w}</li>)}</ul>{!closed&&<label className="checkbox-label"><input type="checkbox" checked={ack} onChange={e=>setAck(e.target.checked)}/>我已核對提醒與收據，確認填寫金額正確</label>}</div>}
-    {error&&<p role="alert" className="error">{error}<button className="text-button" onClick={()=>void reload()}>重新載入草稿</button></p>}{notice&&<p role="status" className="success">{notice}</p>}
+    {error&&<p role="alert" className="error">{error}<button type="button" disabled={busy||itemBusy} className="text-button" onClick={()=>{if(dirty||itemDirty)setDiscard('reload');else void reload();}}>重新載入草稿</button></p>}{notice&&<p role="status" className="success">{notice}</p>}
     {!closed&&<><p className="footnote">儲存修改後，再按「確認入帳」。取消草稿會保留照片與歷程。</p><div className="form-actions"><Button variant="secondary" disabled={busy||itemBusy||itemDirty||dirty||draft.status==='processing'} onClick={()=>void action('retry')}>重新辨識</Button><Button disabled={busy||itemBusy||itemDirty||dirty||draft.status==='processing'||draft.warnings.length>0&&!ack} onClick={()=>void action('confirm')}><Check size={16}/>確認入帳</Button></div>{cancelPrompt?<div className="form-hint">確定取消這份草稿？<Button variant="danger" disabled={busy||itemBusy||itemDirty} onClick={()=>void action('cancel')}>確定取消草稿</Button><button onClick={()=>setCancelPrompt(false)}>返回</button></div>:<button className="text-button" disabled={busy||itemBusy||itemDirty} onClick={()=>setCancelPrompt(true)}>取消這份草稿</button>}</>}
-    </div></div></dialog>;
+    <div className="form-actions"><Button type="button" variant="secondary" disabled={busy||itemBusy} onClick={close}>完成／關閉</Button></div>
+    </div></div></dialog>{discard&&<ConfirmDialog title={discard==='close'?'離開收據核對？':'重新載入收據？'} confirmLabel={discard==='close'?'捨棄修改並關閉':'捨棄修改並重新載入'} onCancel={()=>setDiscard(null)} onConfirm={()=>{const action=discard;setDiscard(null);if(action==='close')onClose();else void reload();}}>有尚未儲存的草稿或品項修改。捨棄後只保留先前已儲存的內容，原始收據與已入帳資料不會刪除。</ConfirmDialog>}</>;
 }

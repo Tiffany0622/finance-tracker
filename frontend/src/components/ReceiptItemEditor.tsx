@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import type { components } from '../api/schema';
 import { Button } from './ui/button';
 import type { Product } from './ProductCatalog';
+import { ConfirmDialog } from './ConfirmDialog';
 
 type Review = components['schemas']['ReviewOutput'];
 type Item = components['schemas']['ItemOutput'];
@@ -15,6 +16,7 @@ export function ReceiptItemEditor({draft,disabled,onDirty,onBusy}:{draft:Draft;d
   const [review,setReview]=useState<Review|null>(null),[items,setItems]=useState<Item[]>([]);
   const [dirty,setDirty]=useState(false),[busy,setBusy]=useState(false),[ack,setAck]=useState(false);
   const [error,setError]=useState(''),[notice,setNotice]=useState('');
+  const [discard,setDiscard]=useState(false);
   const [products,setProducts]=useState<Product[]>([]),[productError,setProductError]=useState(''),[productRefresh,setProductRefresh]=useState(0);
   useEffect(()=>{let active=true;void api<Product[]>('/products/catalog').then(p=>{if(active){setProducts(p);setProductError('');}}).catch(e=>{if(active)setProductError(message(e));});return()=>{active=false;};},[productRefresh]);
   const path=`/capture/drafts/${draft.id}/items`;
@@ -24,8 +26,8 @@ export function ReceiptItemEditor({draft,disabled,onDirty,onBusy}:{draft:Draft;d
   },[path,draft.revision,onDirty]);
   function change(next:Item[]){setItems(next);setDirty(true);onDirty(true);setAck(false);setNotice('');}
   function field(index:number,key:keyof Item,value:string){change(items.map((i,n)=>n===index?{...i,[key]:['quantity','unit_price','line_total','product_id'].includes(key)?value||null:value}:i));}
-  async function reload(){if(dirty&&!window.confirm('重新載入會捨棄尚未儲存的品項修改，確定繼續？'))return;
-    try{const r=await api<Review>(path);setReview(r);setItems(r.items);setDirty(false);onDirty(false);setAck(false);setError('');setNotice('');}catch(e){setError(message(e));}}
+  async function reload(){setBusy(true);onBusy(true);
+    try{const r=await api<Review>(path);setReview(r);setItems(r.items);setDirty(false);onDirty(false);setAck(false);setError('');setNotice('');}catch(e){setError(message(e));}finally{setBusy(false);onBusy(false);}}
   async function save(event:FormEvent){event.preventDefault();if(!review)return;setBusy(true);onBusy(true);setError('');setNotice('');
     try{const r=await api<Review>(path,{method:'PUT',body:JSON.stringify({expected_revision:review.revision,expected_draft_revision:review.draft_revision,expected_transaction_revision:review.transaction_revision,acknowledged:ack,items:items.map(({raw_name:_,...i})=>i)})});
       setReview(r);setItems(r.items);setDirty(false);onDirty(false);setAck(false);setNotice(draft.status==='confirmed'?'品項已核對，可到「商品紀錄」搜尋。帳務金額未改動。':'品項已核對；確認入帳後即可在「商品紀錄」搜尋。');
@@ -50,11 +52,12 @@ export function ReceiptItemEditor({draft,disabled,onDirty,onBusy}:{draft:Draft;d
       </div>)}</div>
       {!items.length&&<p className="muted">還沒有品項，可依收據手動新增。</p>}
       <Button type="button" variant="secondary" disabled={items.length>=200} onClick={()=>change([...items,emptyItem()])}><Plus size={15}/>新增品項</Button>
-      <label className="checkbox-label item-ack"><input type="checkbox" checked={ack} onChange={e=>{setAck(e.target.checked);setDirty(true);onDirty(true);}}/>我已逐項核對原收據；不確定的數值已留白</label>
+      <label className="checkbox-label item-ack"><input type="checkbox" checked={ack} onChange={e=>{setAck(e.target.checked);const changed=e.target.checked||JSON.stringify(items)!==JSON.stringify(review.items);setDirty(changed);onDirty(changed);}}/>我已逐項核對原收據；不確定的數值已留白</label>
       <Button type="submit" disabled={!ack||!review.currency}>{busy?'儲存中…':'儲存已核對品項'}</Button>
     </fieldset></form>}
     {error&&<p role="alert" className="error">{error}</p>}
     {notice&&<p role="status" className="success">{notice}</p>}
-    <button type="button" className="text-button" disabled={busy||disabled} onClick={()=>void reload()}>重新載入品項</button>
+    <button type="button" className="text-button" disabled={busy||disabled} onClick={()=>{if(dirty)setDiscard(true);else void reload();}}>重新載入品項</button>
+    {discard&&<ConfirmDialog title="重新載入品項？" confirmLabel="捨棄修改並重新載入" onCancel={()=>setDiscard(false)} onConfirm={()=>{setDiscard(false);void reload();}}>尚未儲存的品項修改將被捨棄，會恢復先前已儲存的品項。</ConfirmDialog>}
   </section>;
 }

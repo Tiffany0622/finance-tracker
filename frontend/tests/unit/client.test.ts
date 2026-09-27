@@ -1,5 +1,6 @@
-import {beforeEach, expect, test, vi} from 'vitest';
+import {afterEach, beforeEach, expect, test, vi} from 'vitest';
 beforeEach(()=>{vi.resetModules();vi.unstubAllGlobals();});
+afterEach(()=>{vi.useRealTimers();});
 test('concurrent startup and mutations share one CSRF token request',async()=>{
   let release!: (value: Response) => void;
   const tokenResponse=new Promise<Response>(resolve=>{release=resolve;});
@@ -45,4 +46,63 @@ test('network failure never returns a successful stale response',async()=>{
   vi.stubGlobal('fetch',vi.fn().mockRejectedValue(new TypeError('network')));
   const {api}=await import('../../src/api/client');
   await expect(api('/status')).rejects.toMatchObject({code:'offline',status:0});
+});
+
+function stalled(signal:AbortSignal) {
+  return new Promise<Response>((_,reject)=>signal.addEventListener('abort',()=>reject(new DOMException('Aborted','AbortError')),{once:true}));
+}
+test('stalled request times out once, aborts and permits an explicit retry',async()=>{
+  vi.useFakeTimers();
+  let signal!:AbortSignal;
+  const fetchMock=vi.fn((_url:string,options:RequestInit)=>{signal=options.signal!;return stalled(signal);});
+  vi.stubGlobal('fetch',fetchMock);
+  const {api}=await import('../../src/api/client');
+  const failure=expect(api('/capture/drafts')).rejects.toMatchObject({code:'request_timeout'});
+  await vi.advanceTimersByTimeAsync(30000);await failure;
+  expect(signal.aborted).toBe(true);expect(fetchMock).toHaveBeenCalledTimes(1);
+  fetchMock.mockResolvedValueOnce(Response.json({ok:true}));
+  expect(await api('/capture/drafts')).toEqual({ok:true});expect(vi.getTimerCount()).toBe(0);
+});
+test('timeout also covers a response body that never finishes',async()=>{
+  vi.useFakeTimers();
+  vi.stubGlobal('fetch',vi.fn(async(_url:string,options:RequestInit)=>({ok:true,status:200,json:()=>stalled(options.signal!)})));
+  const {api}=await import('../../src/api/client');
+  const failure=expect(api('/capture/drafts')).rejects.toMatchObject({code:'request_timeout'});
+  await vi.advanceTimersByTimeAsync(30000);await failure;expect(vi.getTimerCount()).toBe(0);
+});
+test('CSRF timeout releases the shared promise so forms can retry',async()=>{
+  vi.useFakeTimers();
+  const fetchMock=vi.fn((_url:string,options:RequestInit)=>stalled(options.signal!));
+  vi.stubGlobal('fetch',fetchMock);
+  const {prepareCsrf}=await import('../../src/api/client');
+  const result=Promise.allSettled([prepareCsrf(),prepareCsrf()]);
+  await vi.advanceTimersByTimeAsync(30000);
+  expect((await result).map(r=>r.status)).toEqual(['rejected','rejected']);expect(fetchMock).toHaveBeenCalledTimes(1);
+  fetchMock.mockResolvedValueOnce(Response.json({token:'synthetic-recovered'}));
+  await prepareCsrf();expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+test('refresh timeout releases every waiting request without replaying mutations',async()=>{
+  vi.useFakeTimers();let rotations=0;
+  vi.stubGlobal('fetch',vi.fn(async(url:string,options:RequestInit)=>{
+    if(url.endsWith('/csrf'))return Response.json({token:'synthetic-token'});
+    if(url.endsWith('/refresh')){rotations++;return stalled(options.signal!);}
+    return Response.json({code:'login_required'},{status:401});
+  }));
+  const {api}=await import('../../src/api/client');
+  const result=Promise.allSettled([api('/status'),api('/auth/me')]);
+  await vi.advanceTimersByTimeAsync(30000);
+  expect((await result).map(r=>r.status)).toEqual(['rejected','rejected']);expect(rotations).toBe(1);
+});
+test('file upload has a bounded longer deadline and never retries itself',async()=>{
+  vi.useFakeTimers();let uploads=0;
+  vi.stubGlobal('fetch',vi.fn(async(url:string,options:RequestInit)=>{
+    if(url.endsWith('/csrf'))return Response.json({token:'synthetic-token'});
+    uploads++;return stalled(options.signal!);
+  }));
+  const {api}=await import('../../src/api/client');
+  let finished=false;
+  const request=api('/capture/image',{method:'POST',body:new Blob(['synthetic'])}).finally(()=>{finished=true;});
+  const failure=expect(request).rejects.toMatchObject({code:'request_timeout'});
+  await vi.advanceTimersByTimeAsync(30000);expect(finished).toBe(false);
+  await vi.advanceTimersByTimeAsync(90000);await failure;expect(uploads).toBe(1);
 });

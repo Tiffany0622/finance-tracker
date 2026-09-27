@@ -34,7 +34,7 @@ function useSubmitKey() {
 }
 function Modal({title,children,onClose,busy=false}:{title:string;children:ReactNode;onClose:()=>void;busy?:boolean}) {
   const ref=useRef<HTMLDialogElement>(null);
-  useEffect(()=>{ref.current?.showModal();return()=>ref.current?.close();},[]);
+  useEffect(()=>{const node=ref.current;node?.showModal();return()=>node?.close();},[]);
   return <dialog ref={ref} className="finance-dialog" aria-label={title} onCancel={e=>{e.preventDefault();if(!busy)onClose();}}><div className="dialog-heading"><h2>{title}</h2><button aria-label="關閉" onClick={onClose} disabled={busy}><X size={21}/></button></div>{children}</dialog>;
 }
 export function FinanceWorkspace({tab,currency,timezone}:{tab:string;currency:string;timezone:string}) {

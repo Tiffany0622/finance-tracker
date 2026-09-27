@@ -9,6 +9,15 @@ test('bank, card, expense, repayment, refund, immutable chart export', async ({p
   await page.getByRole('button',{name:'登入',exact:true}).click();
   await expect(page.getByRole('heading',{name:'從容整理，每一筆生活。'})).toBeVisible();
   await page.getByRole('button',{name:'帳戶',exact:true}).click();
+  await page.getByRole('button',{name:'新增帳戶',exact:true}).click();
+  await page.getByRole('dialog',{name:'新增帳戶'}).getByRole('button',{name:'關閉',exact:true}).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button',{name:'新增帳戶',exact:true}).click();
+  await page.getByRole('dialog',{name:'新增帳戶'}).getByRole('button',{name:'取消',exact:true}).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button',{name:'新增帳戶',exact:true}).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   for(const [name,kind,balance] of [[bank,'bank','1000'],[card,'credit_card','0']]) {
     await page.getByRole('button',{name:'新增帳戶',exact:true}).click();
     const dialog=page.getByRole('dialog',{name:'新增帳戶',exact:true});
@@ -25,6 +34,11 @@ test('bank, card, expense, repayment, refund, immutable chart export', async ({p
   await expect(page.getByRole('dialog')).not.toBeVisible();
   await page.getByRole('button',{name:'新增交易',exact:true}).click();
   let dialog=page.getByRole('dialog',{name:'新增交易',exact:true});
+  await dialog.getByRole('button',{name:'新增分類',exact:true}).click();
+  await expect(page.getByRole('dialog',{name:'分類管理',exact:true})).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog',{name:'分類管理',exact:true})).toHaveCount(0);
+  await expect(dialog).toBeVisible();
   await dialog.getByLabel('記帳帳戶').selectOption({label:card+' · USD'});
   await dialog.getByLabel('金額（USD）',{exact:true}).fill('100');
   await dialog.getByRole('combobox',{name:'分類',exact:true}).selectOption({label:category});

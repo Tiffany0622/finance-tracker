@@ -15,6 +15,7 @@ const message=(e:unknown)=>e instanceof Error?e.message:'商品紀錄載入失�
 export function ProductHistory({currency,onCapture}:{currency:string;onCapture:()=>void}) {
   const [text,setText]=useState(''),[query,setQuery]=useState(''),[page,setPage]=useState(0),[refresh,setRefresh]=useState(0);
   const [result,setResult]=useState<Result|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true),[opening,setOpening]=useState(false);
+  const [notice,setNotice]=useState('');
   const [selected,setSelected]=useState<{draft:Draft;accounts:Account[];categories:Category[]}|null>(null);
   useEffect(()=>{let active=true;setLoading(true);setError('');
     void api<Result>(`/products/history?q=${encodeURIComponent(query)}&offset=${page*25}`).then(r=>{if(active)setResult(r);}).catch(e=>{if(active){setError(message(e));setResult(null);}}).finally(()=>{if(active)setLoading(false);});
@@ -34,6 +35,7 @@ export function ProductHistory({currency,onCapture}:{currency:string;onCapture:(
     <details className="catalog-details"><summary>管理商品名稱與別名</summary><ProductCatalog onSaved={()=>{setPage(0);setRefresh(n=>n+1);}}/></details>
     {!!result?.pending_receipts&&<div className="form-hint">有 {result.pending_receipts} 份已入帳收據尚待品項核對。請到「收據草稿」勾選「包含已入帳與已取消」，開啟舊收據補核對。</div>}
     {error&&<p role="alert" className="error">{error}<button className="text-button" onClick={()=>setRefresh(n=>n+1)}>重試</button></p>}
+    {notice&&<p role="status" className="success">{notice}</p>}
     {loading?<p role="status">正在搜尋商品紀錄…</p>:result&&<>
       <div className="section-heading"><h2>{query?`「${query}」的購買紀錄`:'全部購買紀錄'}</h2><span>第 {page+1} 頁 · 本頁 {result.items.length} 項</span></div>
       {!result.items.length?<section className="empty-state panel"><ShoppingBag size={30}/><h2>沒有符合的已核對商品</h2><p>可換用收據原文搜尋，或先核對收據品項。</p></section>:<div className="purchase-list">{result.items.map((item,n)=><article className="panel purchase-card" key={`${item.draft_id}-${n}`}>
@@ -46,6 +48,6 @@ export function ProductHistory({currency,onCapture}:{currency:string;onCapture:(
       </article>)}</div>}
       <div className="form-actions"><Button variant="secondary" disabled={!page} onClick={()=>setPage(n=>n-1)}>上一頁</Button><span>第 {page+1} 頁</span><Button variant="secondary" disabled={!result.has_more} onClick={()=>setPage(n=>n+1)}>下一頁</Button></div>
     </>}
-    {selected&&<DraftEditor key={selected.draft.id} initial={selected.draft} accounts={selected.accounts} categories={selected.categories} currency={currency} onSaved={()=>setRefresh(n=>n+1)} onClose={()=>{setSelected(null);setRefresh(n=>n+1);}}/>}
+    {selected&&<DraftEditor key={selected.draft.id} initial={selected.draft} accounts={selected.accounts} categories={selected.categories} currency={currency} onSaved={text=>{if(text)setNotice(text);setRefresh(n=>n+1);}} onClose={()=>{setSelected(null);setRefresh(n=>n+1);}}/>}
   </>;
 }

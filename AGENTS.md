@@ -8,6 +8,7 @@ Read `01-requirements.md`, `02-architecture.md`, `03-data-model.md`, `04-dev-pla
 - PostgreSQL is authoritative. Use real PostgreSQL integration tests, Decimal for financial values, migrations for schema changes, and backend-generated report snapshots in later phases.
 - Never commit `.env`, production data, attachments, backups, logs, local runtime downloads or browser sessions. Test fixtures must be synthetic.
 - Do not overwrite user changes or a real DB to make tests pass. `TEST_DATABASE_URL` must name a disposable `finance_test*` database. Tests truncate its app tables and create temporary `finance_restore_*` databases.
+- Use isolated browser contexts for synthetic test logins. Different localhost ports share cookies; never log in to a test server using the browser profile that holds the user's production session.
 - Do not ask for secrets in chat. Initial accounts are created by the interactive CLI; no default production account/password.
 
 ## Commands

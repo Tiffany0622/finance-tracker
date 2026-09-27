@@ -61,6 +61,13 @@
 /* Reviewed receipt items and purchase history share the ledger's visual language. */
 @media (min-width: 761px) { .capture-evidence { position: sticky; top: 16px; align-self: start; max-height: calc(90dvh - 32px); overflow: auto; } }
 .item-review { border-top: 1px solid var(--line, #e3e5df); margin-top: 24px; padding-top: 20px; }
+.finance-dialog > .dialog-heading { position: sticky; top: -28px; z-index: 2; background: #fff; margin: -28px -28px 0; padding: 20px 28px 14px; border-bottom: 1px solid #e3e5df; }
+.finance-dialog > .dialog-heading > button { min-width: 44px; min-height: 44px; flex-shrink: 0; }
+.confirm-dialog { max-width: 480px; }
+.confirm-dialog p { margin-top: 16px; line-height: 1.7; }
+.confirm-dialog .form-actions { flex-wrap: wrap; }
+@media (max-width: 760px) { .finance-dialog > .dialog-heading { top: -21px; margin: -21px -21px 0; padding: 14px 21px; } }
+@media (max-width: 600px) { .receipt-dialog > .dialog-heading { top: -20px; margin: -20px -20px 0; padding: 14px 20px; } }
 .item-review h3, .purchase-card h3 { margin: 0; overflow-wrap: anywhere; }
 .item-edit-list { display: grid; gap: 12px; margin-bottom: 14px; }
 .item-edit-card { background: #f6f7f3; border: 1px solid #e3e5df; border-radius: 12px; padding: 14px; min-width: 0; }

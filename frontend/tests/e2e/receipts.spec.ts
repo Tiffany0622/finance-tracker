@@ -26,6 +26,12 @@ test('receipt upload, HEIC preview, download, reload and removal preserve the tr
   const row = page.getByRole('row').filter({hasText:name});
   await row.getByRole('button',{name:'收據',exact:true}).click();
   let dialog = page.getByRole('dialog',{name:'收據附件',exact:true});
+  await dialog.getByRole('button',{name:'關閉收據附件',exact:true}).click();
+  await expect(dialog).not.toBeVisible();
+  await row.getByRole('button',{name:'收據',exact:true}).click();
+  await page.keyboard.press('Escape');
+  await expect(dialog).not.toBeVisible();
+  await row.getByRole('button',{name:'收據',exact:true}).click();
   const png = path.resolve('tests/fixtures/receipt.png'), heic = path.resolve('tests/fixtures/receipt.heic');
   await dialog.locator('input[type=file]').setInputFiles([png,heic]);
   await dialog.getByRole('button',{name:'上傳／重試待處理圖片'}).click();

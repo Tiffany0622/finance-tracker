@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api } from '../api/client';
 import type { components } from '../api/schema';
 import { Button } from './ui/button';
+import { ConfirmDialog } from './ConfirmDialog';
 
 export type Product = components['schemas']['ProductOutput'];
 const message = (e: unknown) => e instanceof Error ? e.message : '商品尚未儲存，請重試。';
@@ -11,13 +12,16 @@ export function ProductCatalog({onSaved}:{onSaved:()=>void}) {
   const [name,setName]=useState(''),[aliases,setAliases]=useState(''),[note,setNote]=useState('');
   const [error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[refresh,setRefresh]=useState(0),[dirty,setDirty]=useState(false);
   const submission=useRef<{body:string;key:string}|null>(null);
+  const [discard,setDiscard]=useState<{product:Product|null;reload:boolean}|null>(null);
   useEffect(()=>{let active=true;setLoading(true);
     void api<Product[]>('/products/catalog').then(p=>{if(active){setProducts(p);setError('');}}).catch(e=>{if(active)setError(message(e));}).finally(()=>{if(active)setLoading(false);});
     return()=>{active=false;};
   },[refresh]);
-  function edit(p:Product|null){if(dirty&&!window.confirm('切換商品會捨棄尚未儲存的修改，確定繼續？'))return;
+  function apply(p:Product|null){
     setSelected(p);setName(p?.name??'');setAliases(p?.aliases.join('\n')??'');setNote(p?.note??'');setError('');setNotice('');setDirty(false);submission.current=null;
   }
+  function edit(p:Product|null){if(dirty)setDiscard({product:p,reload:false});else apply(p);}
+  function reload(){if(dirty)setDiscard({product:null,reload:true});else{apply(null);setRefresh(n=>n+1);}}
   async function save(e:FormEvent){e.preventDefault();setBusy(true);setError('');setNotice('');
     const body=JSON.stringify({name:name.trim(),aliases:aliases.split('\n').map(s=>s.trim()).filter(Boolean),note,...(selected?{expected_revision:selected.revision}:{})});
     if(submission.current?.body!==body)submission.current={body,key:crypto.randomUUID()};
@@ -36,6 +40,7 @@ export function ProductCatalog({onSaved}:{onSaved:()=>void}) {
       <div className="form-actions"><Button type="submit">{busy?'儲存中…':selected?'儲存商品修改':'建立商品'}</Button><Button type="button" variant="secondary" onClick={()=>edit(null)}>清空／新增另一商品</Button></div>
     </fieldset></form>
     {error&&<p role="alert" className="error">{error}</p>}{notice&&<p role="status" className="success">{notice}</p>}
-    <button type="button" className="text-button" disabled={busy} onClick={()=>{if(dirty&&!window.confirm('重新載入會捨棄尚未儲存的商品修改，確定繼續？'))return;setSelected(null);setName('');setAliases('');setNote('');setDirty(false);setRefresh(n=>n+1);}}>重新載入商品清單</button>
+    <button type="button" className="text-button" disabled={busy} onClick={reload}>重新載入商品清單</button>
+    {discard&&<ConfirmDialog title="捨棄商品修改？" confirmLabel="捨棄修改並繼續" onCancel={()=>setDiscard(null)} onConfirm={()=>{apply(discard.product);if(discard.reload)setRefresh(n=>n+1);setDiscard(null);}}>切換或重新載入商品會捨棄尚未儲存的修改。已儲存的商品與收據不受影響。</ConfirmDialog>}
   </section>;
 }
