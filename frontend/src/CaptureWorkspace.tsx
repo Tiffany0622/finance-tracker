@@ -5,6 +5,7 @@ import type { components } from './api/schema';
 import { ReceiptItemEditor } from './components/ReceiptItemEditor';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { CategoryForm } from './components/CategoryForm';
+import { CategorySuggestions } from './components/CategorySuggestions';
 import { Button } from './components/ui/button';
 
 type Draft = components['schemas']['DraftOutput'];
@@ -68,6 +69,7 @@ export function DraftEditor({initial,accounts,categories,currency,onClose,onSave
   const [itemDirty,setItemDirty]=useState(false),[itemBusy,setItemBusy]=useState(false);
   const [discard,setDiscard]=useState<'close'|'reload'|null>(null),[reloadVersion,setReloadVersion]=useState(0);
   const [categoryTarget,setCategoryTarget]=useState<'single'|number|null>(null),[createdCategories,setCreatedCategories]=useState<Category[]>([]);
+  const [categoryName,setCategoryName]=useState(''),[suggestionVersion,setSuggestionVersion]=useState(0);
   const categoryList=[...new Map([...createdCategories,...categories].map(c=>[c.id,c])).values()];
   const availableCategories=categoryList.filter(c=>!c.archived&&c.kind===proposal.kind);
   const categoryLabel=(category:Category)=>{const parent=categoryList.find(c=>c.id===category.parent_id);return parent?`${parent.name} → ${category.name}`:category.name;};
@@ -85,7 +87,15 @@ export function DraftEditor({initial,accounts,categories,currency,onClose,onSave
     setCreatedCategories(rows=>[...rows,category]);
     if(categoryTarget==='single')change('category_id',category.id);
     else change('splits',(proposal.splits??[]).map((s,i)=>i===categoryTarget?{...s,category_id:category.id}:s));
-    setCategoryTarget(null);setNotice(`分類「${category.name}」已新增並選用，請儲存草稿修改。`);onSaved();
+    setCategoryTarget(null);setSuggestionVersion(v=>v+1);setNotice(`分類「${category.name}」已新增並選用，請儲存草稿修改。`);onSaved();
+  }
+  function openCategory(target:'single'|number,name=''){setCategoryName(name);setCategoryTarget(target);}
+  function chooseSuggestion(suggestion:components['schemas']['CategorySuggestion'],target:'single'|number){
+    if(!suggestion.category_id){openCategory(target,suggestion.name);return;}
+    if(!availableCategories.some(c=>c.id===suggestion.category_id)){setError('分類清單已變更，請更新草稿與建議後再選用。');onSaved();return;}
+    if(target==='single')change('category_id',suggestion.category_id);
+    else change('splits',(proposal.splits??[]).map((s,i)=>i===target?{...s,category_id:suggestion.category_id!}:s));
+    setNotice('已選用建議分類，請儲存草稿修改。');
   }
   async function reload(){setBusy(true);setError('');try{const row=await api<Draft>('/capture/drafts/'+draft.id);setDraft(row);setProposal(row.proposal);setDirty(false);setItemDirty(false);setReloadVersion(v=>v+1);setAck(false);setNotice('已重新載入已儲存的草稿與品項。');}catch(e){setError(message(e));}finally{setBusy(false);}}
   async function save(e:FormEvent){e.preventDefault();setBusy(true);setError('');try{const row=await api<Draft>('/capture/drafts/'+draft.id,{method:'PUT',body:JSON.stringify({expected_revision:draft.revision,proposal})});setDraft(row);setProposal(row.proposal);setDirty(false);setNotice('草稿已儲存，請核對後確認入帳。');onSaved();}catch(e){setError(message(e));}finally{setBusy(false);}}
@@ -105,18 +115,19 @@ export function DraftEditor({initial,accounts,categories,currency,onClose,onSave
     <div className="form-grid"><label>金額<input inputMode="decimal" value={proposal.amount??''} onChange={e=>change('amount',e.target.value||null)} pattern="[0-9]+(\.[0-9]{1,2})?" placeholder="尚未辨識"/></label><label>帳務日期<input type="date" value={proposal.occurred_on??''} onChange={e=>change('occurred_on',e.target.value||null)}/></label></div>
     <label>記帳帳戶<select value={proposal.account_id??''} onChange={e=>change('account_id',e.target.value||null)}><option value="">請選擇帳戶</option>{accounts.filter(a=>!a.archived).map(a=><option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select></label>
     {source&&source.currency!==currency&&<label>入帳匯率（1 {source.currency} = 多少 {currency}）<input inputMode="decimal" value={proposal.fx_rate??''} onChange={e=>change('fx_rate',e.target.value||null)}/></label>}
-    <div className="section-heading compact"><h3>分類{proposal.splits?.length?'分攤':''}</h3>{!proposal.splits?.length&&<button type="button" className="text-button" onClick={()=>setCategoryTarget('single')}>新增分類</button>}</div>
+    <div className="section-heading compact"><h3>分類{proposal.splits?.length?'分攤':''}</h3>{!proposal.splits?.length&&<button type="button" className="text-button" onClick={()=>openCategory('single')}>新增分類</button>}</div>
+    {!closed&&<CategorySuggestions draftId={draft.id} input={{expected_revision:draft.revision,kind:proposal.kind,merchant:proposal.merchant,note:proposal.note}} reviewVersion={suggestionVersion+reloadVersion} splitCount={proposal.splits?.length??0} disabled={busy||itemBusy||itemDirty} onChoose={chooseSuggestion}/>}
     {!availableCategories.length&&<p className="form-hint">尚未建立{proposal.kind==='income'?'收入':'支出'}分類。請按「新增分類」建立後再選用。</p>}
-    {!proposal.splits?.length?<label>分類<select value={proposal.category_id??''} onChange={e=>change('category_id',e.target.value||null)}><option value="">請選擇分類</option>{availableCategories.map(c=><option key={c.id} value={c.id}>{categoryLabel(c)}</option>)}</select></label>:proposal.splits.map((s,i)=><div className="receipt-split" key={i}><div className="split-row"><label>分攤分類 {i+1}<select required value={s.category_id} onChange={e=>change('splits',proposal.splits!.map((v,j)=>j===i?{...v,category_id:e.target.value}:v))}><option value="">請選擇</option>{availableCategories.map(c=><option key={c.id} value={c.id}>{categoryLabel(c)}</option>)}</select></label><label>分攤金額 {i+1}<input required inputMode="decimal" pattern="[0-9]+(\.[0-9]{1,2})?" placeholder="請填寫金額" value={s.amount} onChange={e=>change('splits',proposal.splits!.map((v,j)=>j===i?{...v,amount:e.target.value}:v))}/></label><button type="button" aria-label={`移除分攤${i+1}`} onClick={()=>removeSplit(i)}><X size={16}/></button></div><button type="button" className="text-button" aria-label={`新增分類至分攤 ${i+1}`} onClick={()=>setCategoryTarget(i)}>新增分類</button></div>)}
+    {!proposal.splits?.length?<label>分類<select value={proposal.category_id??''} onChange={e=>change('category_id',e.target.value||null)}><option value="">請選擇分類</option>{availableCategories.map(c=><option key={c.id} value={c.id}>{categoryLabel(c)}</option>)}</select></label>:proposal.splits.map((s,i)=><div className="receipt-split" key={i}><div className="split-row"><label>分攤分類 {i+1}<select required value={s.category_id} onChange={e=>change('splits',proposal.splits!.map((v,j)=>j===i?{...v,category_id:e.target.value}:v))}><option value="">請選擇</option>{availableCategories.map(c=><option key={c.id} value={c.id}>{categoryLabel(c)}</option>)}</select></label><label>分攤金額 {i+1}<input required inputMode="decimal" pattern="[0-9]+(\.[0-9]{1,2})?" placeholder="請填寫金額" value={s.amount} onChange={e=>change('splits',proposal.splits!.map((v,j)=>j===i?{...v,amount:e.target.value}:v))}/></label><button type="button" aria-label={`移除分攤${i+1}`} onClick={()=>removeSplit(i)}><X size={16}/></button></div><button type="button" className="text-button" aria-label={`新增分類至分攤 ${i+1}`} onClick={()=>openCategory(i)}>新增分類</button></div>)}
     <p className="footnote">找不到適合的選項？按「新增分類」建立名稱。只有一筆收據要分到多個分類時，才使用下方的分類分攤。</p>
     <button type="button" className="text-button receipt-split-add" disabled={(proposal.splits?.length??0)>=30} onClick={()=>{const splits=proposal.splits?.length?proposal.splits:[{category_id:proposal.category_id||'',amount:proposal.amount||''}];change('splits',[...splits,{category_id:'',amount:''}]);change('category_id',null);}}><Plus size={14}/>加入分類分攤</button>
     {!!proposal.splits?.length&&<p className="form-hint">每列都需選擇分類、填寫大於 0 的金額，合計必須等於收據金額 {proposal.currency} {proposal.amount??'（待填）'}。移除至一列時會改回單一分類，使用整筆收據金額。</p>}
     <label>商家<input maxLength={200} value={proposal.merchant} onChange={e=>change('merchant',e.target.value)}/></label><label>標籤（逗號分隔）<input value={(proposal.tags??[]).join(',')} onChange={e=>change('tags',e.target.value.split(',').filter(Boolean))}/></label><label>備註<textarea rows={2} maxLength={2000} value={proposal.note} onChange={e=>change('note',e.target.value)}/></label>
     {!closed&&<Button type="submit" disabled={busy||itemBusy||itemDirty||!dirty}>儲存草稿修改</Button>}</fieldset></form>
-    <ReceiptItemEditor key={`${draft.id}:${reloadVersion}`} draft={draft} disabled={busy||dirty} onDirty={setItemDirty} onBusy={setItemBusy}/>
+    <ReceiptItemEditor key={`${draft.id}:${reloadVersion}`} draft={draft} disabled={busy||dirty} onDirty={setItemDirty} onBusy={setItemBusy} onSaved={()=>setSuggestionVersion(v=>v+1)}/>
     {draft.warnings.length>0&&<div className="capture-warnings"><strong>請核對以下提醒</strong><ul>{draft.warnings.map((w,i)=><li key={i}>{w}</li>)}</ul>{!closed&&<label className="checkbox-label"><input type="checkbox" checked={ack} onChange={e=>setAck(e.target.checked)}/>我已核對提醒與收據，確認填寫金額正確</label>}</div>}
     {error&&<p role="alert" className="error">{error}<button type="button" disabled={busy||itemBusy} className="text-button" onClick={()=>{if(dirty||itemDirty)setDiscard('reload');else void reload();}}>重新載入草稿</button></p>}{notice&&<p role="status" className="success">{notice}</p>}
     {!closed&&<><p className="footnote">儲存修改後，再按「確認入帳」。取消草稿會保留照片與歷程。</p><div className="form-actions"><Button variant="secondary" disabled={busy||itemBusy||itemDirty||dirty||draft.status==='processing'} onClick={()=>void action('retry')}>重新辨識</Button><Button disabled={busy||itemBusy||itemDirty||dirty||draft.status==='processing'||draft.warnings.length>0&&!ack} onClick={()=>void action('confirm')}><Check size={16}/>確認入帳</Button></div>{cancelPrompt?<div className="form-hint">確定取消這份草稿？<Button variant="danger" disabled={busy||itemBusy||itemDirty} onClick={()=>void action('cancel')}>確定取消草稿</Button><button onClick={()=>setCancelPrompt(false)}>返回</button></div>:<button className="text-button" disabled={busy||itemBusy||itemDirty} onClick={()=>setCancelPrompt(true)}>取消這份草稿</button>}</>}
     <div className="form-actions"><Button type="button" variant="secondary" disabled={busy||itemBusy} onClick={close}>完成／關閉</Button></div>
-    </div></div></dialog>{categoryTarget!==null&&<CategoryForm categories={categoryList} fixedKind={proposal.kind} onClose={()=>setCategoryTarget(null)} onSave={categoryCreated}/>} {discard&&<ConfirmDialog title={discard==='close'?'離開收據核對？':'重新載入收據？'} confirmLabel={discard==='close'?'捨棄修改並關閉':'捨棄修改並重新載入'} onCancel={()=>setDiscard(null)} onConfirm={()=>{const action=discard;setDiscard(null);if(action==='close')onClose();else void reload();}}>有尚未儲存的草稿或品項修改。捨棄後只保留先前已儲存的內容，原始收據與已入帳資料不會刪除。</ConfirmDialog>}</>;
+    </div></div></dialog>{categoryTarget!==null&&<CategoryForm categories={categoryList} fixedKind={proposal.kind} initialName={categoryName} onClose={()=>setCategoryTarget(null)} onSave={categoryCreated}/>} {discard&&<ConfirmDialog title={discard==='close'?'離開收據核對？':'重新載入收據？'} confirmLabel={discard==='close'?'捨棄修改並關閉':'捨棄修改並重新載入'} onCancel={()=>setDiscard(null)} onConfirm={()=>{const action=discard;setDiscard(null);if(action==='close')onClose();else void reload();}}>有尚未儲存的草稿或品項修改。捨棄後只保留先前已儲存的內容，原始收據與已入帳資料不會刪除。</ConfirmDialog>}</>;
 }

@@ -330,3 +330,11 @@ Web 與 Telegram 的查詢共用 `items.search`：既有 literal substring OR ow
 `GET/PUT /api/v1/capture/drafts/{id}/items` 是核對契約，`GET /api/v1/products/history?q=&offset=` 每頁 25 列，依購買日期倒序。查詢以 owner、有效支出、最新有效核對版本限制來源，再以不分英文大小寫的字面 substring 比對修正品名與原文（跳脫 `%`、`_`、`\`）。日期／商店不預限；未核對舊收據數量另外提醒。Web 可返回同一收據原圖與編輯器；Bot `/lookup` 共用查詢、最多 5 列，更多結果在 Web。附照片的 `/lookup` 只說明尚未支援，不誤建記帳草稿。
 
 新表納入備份 row counts、內容指紋與隔離還原驗證，保留舊 0003 / 0004 備份的對應驗證方式。API／worker schema gate 更新至 0005。沒有新增外部服務、模型或依賴；大資料量搜尋 p95 仍待專項量測。
+
+### 草稿分類建議（2026-09-27）
+
+`POST /api/v1/capture/drafts/{id}/category-suggestions` 是唯讀預覽，接收 expected_revision、收支類型及目前未儲存的 merchant / note；沿用 owner、登入、CSRF 與 Origin 檢查，拒絕過期／已關閉草稿。`capture/category_suggestions.py` 不寫 DB、不建立模型工作。依同 owner、同收支類型、已入帳的最近 500 筆交易，只查 current_entry_id 的分攤；作廢、歷史修訂、封存及不同收支類型分類不作候選。同一交易的重複分攤分類只計一次。商家採 NFKC／空白收斂／casefold 後完整比對，不將相似名稱視為同店。
+
+文字規則優先讀取最新且符合草稿版本的已核對品名（明確清空也尊重），否則讀取原始解析品名，並加入目前商家／備註。既有分類名稱以限定別名對應；沒有對應才建議新名稱，已封存的規則對應名稱不自動重建。回傳最多三項、來源與具體理由，不宣稱模型信心百分比。無證據時常用／現有選項明示資訊不足。
+
+Web 輸入變動以 350 ms debounce 更新預覽，取消舊請求並以 request key 隔離過期回應；品項儲存、草稿重新載入、分類建立後重新取得建議。建議失敗保留手動選擇與重試。選用才修改表單；新增仍走既有分類服務，分攤必須明確選目標列，未提交時不更動帳務。Bot 卡片及自訂商家規則未納入本批。

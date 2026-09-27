@@ -2774,6 +2774,126 @@
         }
       }
     },
+    "/api/v1/capture/drafts/{identity}/category-suggestions": {
+      "post": {
+        "summary": "Category Suggestions",
+        "operationId": "category_suggestions_api_v1_capture_drafts__identity__category_suggestions_post",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identity"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategorySuggestions"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOutput"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOutput"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOutput"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOutput"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOutput"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOutput"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOutput"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOutput"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
     "/api/v1/capture/image": {
       "post": {
         "summary": "Image Capture",
@@ -6748,6 +6868,74 @@
         ],
         "title": "CategoryOutput"
       },
+      "CategorySuggestion": {
+        "properties": {
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "merchant_history",
+              "receipt_text",
+              "common",
+              "fallback"
+            ],
+            "title": "Source"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category_id",
+          "name",
+          "source",
+          "reason"
+        ],
+        "title": "CategorySuggestion"
+      },
+      "CategorySuggestions": {
+        "properties": {
+          "draft_revision": {
+            "type": "integer",
+            "title": "Draft Revision"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/CategorySuggestion"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "draft_revision",
+          "suggestions",
+          "message"
+        ],
+        "title": "CategorySuggestions"
+      },
       "CsrfOutput": {
         "properties": {
           "token": {
@@ -8228,6 +8416,42 @@
           "integrations"
         ],
         "title": "StatusOutput"
+      },
+      "SuggestionInput": {
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income"
+            ],
+            "title": "Kind"
+          },
+          "merchant": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Merchant"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision",
+          "kind",
+          "merchant",
+          "note"
+        ],
+        "title": "SuggestionInput"
       },
       "TelegramUpdate": {
         "properties": {

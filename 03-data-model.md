@@ -352,3 +352,9 @@ ReportSnapshot 以不可變 JSON document 保存完整 metadata／指標／明�
 - quantity 已知時 > 0；unit_price 已知時 >= 0；line_total 允許負值記錄獨立折扣列。空值不補零。API 以十進位字串輸入／輸出，金額不用 float。逐項數量 × 單價、明細與 AI 小計不符會提示，不擅自更改整筆帳務。
 - 未入帳核對與確認入帳皆保存版本。confirmation 只沿用來源未變且幣別一致的核對，並寫入正式 transaction revision；不建立第二份費用／posting。之後修訂正式帳務，舊核對暫不搜尋，直到再次人工核對。
 - 舊收據不批次回填為已確認商品；API 以既有 parsed 顯示候選，第一次核對才新增資料列。重辨識不清除先前修正與來源快照。所有新表採 owner 外鍵及複合關聯；納入正式備份與還原指紋。
+
+## 2026-09-27：分類建議衍生資料
+
+分類候選即時由既有 categories、transactions 的目前 journal entry 分攤、capture_drafts 與有效 receipt_item_reviews / receipt_items 產生，不新增資料表或遷移；正式 schema 保持 `0006_products`。候選含 category_id（新名稱為 null）、name、source、reason 與 draft_revision，僅是暫時預覽，不寫入 parsed、parse attempts 或原始品項。
+
+明確建立建議名稱時，沿用 categories 的 owner、兩層結構、類型及冪等驗證。明確選用後仍須儲存，才會寫入既有 proposal.category_id / splits 並增加草稿 revision；確認入帳仍經原 ledger service。建議本身不建立交易、posting、歷史商家規則或額外備份內容；未來規則引擎／商家預設仍未實作。

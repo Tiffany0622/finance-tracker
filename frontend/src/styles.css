@@ -67,6 +67,7 @@
 .confirm-dialog p { margin-top: 16px; line-height: 1.7; }
 .confirm-dialog .form-actions { flex-wrap: wrap; }
 .receipt-split{margin-bottom:16px}.receipt-split .split-row label{min-width:0}.receipt-split>.text-button{font-size:12px}.receipt-split-add{display:inline-flex;align-items:center;gap:6px}
+.category-suggestions{margin:16px 0;padding:16px;border:1px solid #dce7d5;border-radius:10px;background:#f7f9f3;min-width:0}.category-suggestions .section-heading{margin:0 0 8px;gap:12px}.category-suggestions h4{font-size:14px}.category-suggestion-list{display:grid;gap:10px;margin-top:12px}.category-suggestion-card{padding:14px;background:white;border:1px solid #e0e7da;border-radius:8px;min-width:0}.category-suggestion-card strong{display:block;margin:6px 0;font-size:14px;overflow-wrap:anywhere}.category-suggestion-card p{font-size:12px;line-height:1.6;color:#6d815d;margin-bottom:10px}.category-suggestion-card .suggestion-source{font-size:11px;color:#718467}.category-suggestions .footnote{margin-top:10px}
 @media (max-width: 760px) { .finance-dialog > .dialog-heading { top: -21px; margin: -21px -21px 0; padding: 14px 21px; } }
 @media (max-width: 600px) { .receipt-dialog > .dialog-heading { top: -20px; margin: -20px -20px 0; padding: 14px 20px; } }
 .item-review h3, .purchase-card h3 { margin: 0; overflow-wrap: anywhere; }

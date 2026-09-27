@@ -29,6 +29,7 @@ from app.ledger.service import book_lock, fail, owned
 from app.receipts import service as files
 
 from . import service, telegram
+from .category_suggestions import CategorySuggestions, SuggestionInput, candidates
 from .schemas import (
     BridgeClaim,
     BridgeJob,
@@ -130,6 +131,14 @@ def text_capture(
     user: Principal = Depends(principal),
 ) -> DraftOutput:
     return service.create_web(user.owner_id, key, request, text=body.text)
+
+
+@router.post("/drafts/{identity}/category-suggestions", response_model=CategorySuggestions)
+def category_suggestions(
+    identity: uuid.UUID, body: SuggestionInput, user: Principal = Depends(principal)
+) -> CategorySuggestions:
+    with Session(engine()) as db:
+        return candidates(db, user.owner_id, identity, body)
 
 
 @router.post(

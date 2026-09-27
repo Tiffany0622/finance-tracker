@@ -315,6 +315,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/capture/drafts/{identity}/category-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Category Suggestions */
+        post: operations["category_suggestions_api_v1_capture_drafts__identity__category_suggestions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/capture/image": {
         parameters: {
             query?: never;
@@ -987,6 +1004,29 @@ export interface components {
              */
             archived: boolean;
         };
+        /** CategorySuggestion */
+        CategorySuggestion: {
+            /** Category Id */
+            category_id: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "merchant_history" | "receipt_text" | "common" | "fallback";
+            /** Reason */
+            reason: string;
+        };
+        /** CategorySuggestions */
+        CategorySuggestions: {
+            /** Draft Revision */
+            draft_revision: number;
+            /** Suggestions */
+            suggestions: components["schemas"]["CategorySuggestion"][];
+            /** Message */
+            message: string;
+        };
         /** CsrfOutput */
         CsrfOutput: {
             /** Token */
@@ -1461,6 +1501,20 @@ export interface components {
             integrations: {
                 [key: string]: string;
             };
+        };
+        /** SuggestionInput */
+        SuggestionInput: {
+            /** Expected Revision */
+            expected_revision: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "expense" | "income";
+            /** Merchant */
+            merchant: string;
+            /** Note */
+            note: string;
         };
         /** TelegramUpdate */
         TelegramUpdate: {
@@ -3871,6 +3925,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DraftOutput"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOutput"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOutput"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOutput"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOutput"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOutput"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOutput"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOutput"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOutput"];
+                };
+            };
+        };
+    };
+    category_suggestions_api_v1_capture_drafts__identity__category_suggestions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                identity: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuggestionInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategorySuggestions"];
                 };
             };
             /** @description Bad Request */

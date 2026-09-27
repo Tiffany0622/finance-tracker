@@ -12,7 +12,7 @@ type Draft = components['schemas']['DraftOutput'];
 const message = (e: unknown) => e instanceof Error ? e.message : '品項尚未儲存，請稍後再試。';
 const emptyItem = (): Item => ({product_id:null,source_line_no:null,raw_name:'',name:'',quantity:null,unit_price:null,line_total:null,unit:'',note:''});
 
-export function ReceiptItemEditor({draft,disabled,onDirty,onBusy}:{draft:Draft;disabled:boolean;onDirty:(dirty:boolean)=>void;onBusy:(busy:boolean)=>void}) {
+export function ReceiptItemEditor({draft,disabled,onDirty,onBusy,onSaved}:{draft:Draft;disabled:boolean;onDirty:(dirty:boolean)=>void;onBusy:(busy:boolean)=>void;onSaved:()=>void}) {
   const [review,setReview]=useState<Review|null>(null),[items,setItems]=useState<Item[]>([]);
   const [dirty,setDirty]=useState(false),[busy,setBusy]=useState(false),[ack,setAck]=useState(false);
   const [error,setError]=useState(''),[notice,setNotice]=useState('');
@@ -30,7 +30,7 @@ export function ReceiptItemEditor({draft,disabled,onDirty,onBusy}:{draft:Draft;d
     try{const r=await api<Review>(path);setReview(r);setItems(r.items);setDirty(false);onDirty(false);setAck(false);setError('');setNotice('');}catch(e){setError(message(e));}finally{setBusy(false);onBusy(false);}}
   async function save(event:FormEvent){event.preventDefault();if(!review)return;setBusy(true);onBusy(true);setError('');setNotice('');
     try{const r=await api<Review>(path,{method:'PUT',body:JSON.stringify({expected_revision:review.revision,expected_draft_revision:review.draft_revision,expected_transaction_revision:review.transaction_revision,acknowledged:ack,items:items.map(({raw_name:_,...i})=>i)})});
-      setReview(r);setItems(r.items);setDirty(false);onDirty(false);setAck(false);setNotice(draft.status==='confirmed'?'品項已核對，可到「商品紀錄」搜尋。帳務金額未改動。':'品項已核對；確認入帳後即可在「商品紀錄」搜尋。');
+      setReview(r);setItems(r.items);setDirty(false);onDirty(false);setAck(false);setNotice(draft.status==='confirmed'?'品項已核對，可到「商品紀錄」搜尋。帳務金額未改動。':'品項已核對；確認入帳後即可在「商品紀錄」搜尋。');onSaved();
     }catch(e){setError(message(e));}finally{setBusy(false);onBusy(false);}}
   return <section className="item-review" aria-labelledby="item-review-title">
     <div className="section-heading"><h3 id="item-review-title">品項核對／修正</h3><span>{review?{unreviewed:'尚未核對',reviewed:'已核對',stale:'需要重新核對'}[review.status]:'載入中'}</span></div>
