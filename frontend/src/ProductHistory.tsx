@@ -4,6 +4,7 @@ import { api } from './api/client';
 import type { components } from './api/schema';
 import { DraftEditor } from './CaptureWorkspace';
 import { Button } from './components/ui/button';
+import { ProductCatalog } from './components/ProductCatalog';
 
 type Result = components['schemas']['SearchOutput'];
 type Draft = components['schemas']['DraftOutput'];
@@ -27,9 +28,10 @@ export function ProductHistory({currency,onCapture}:{currency:string;onCapture:(
   return <>
     <div className="page-heading"><div><p className="eyebrow">REMEMBER THE DETAILS</p><h1>商品紀錄</h1><p>找回買過的商品，以及當時的價格。</p></div><Button variant="secondary" onClick={onCapture}>核對收據品項</Button></div>
     <section className="panel"><form className="product-search" onSubmit={search}><label>搜尋商品<input type="search" maxLength={200} placeholder="輸入品名或收據原文，例如：蘋果、Apples" value={text} onChange={e=>setText(e.target.value)}/></label><Button type="submit" disabled={loading}><Search size={16}/>搜尋</Button></form>
-      <p className="footnote">搜尋全部日期與商店的已核對、已入帳支出，留白可瀏覽全部商品。支援品名與辨識原文的關鍵字；同義詞、照片搜尋尚未開放。</p>
+      <p className="footnote">搜尋全部日期與商店的已核對、已入帳支出，留白可瀏覽全部商品。支援品名、辨識原文的關鍵字，以及手動連結商品的完整名稱／別名。照片搜尋尚未開放。</p>
       <p className="footnote">價格依收據品項記錄，稅與小費未另行分攤、退款未抵扣。不明欄位保留空缺，不同幣別與規格不合併計算。</p>
     </section>
+    <details className="catalog-details"><summary>管理商品名稱與別名</summary><ProductCatalog onSaved={()=>{setPage(0);setRefresh(n=>n+1);}}/></details>
     {!!result?.pending_receipts&&<div className="form-hint">有 {result.pending_receipts} 份已入帳收據尚待品項核對。請到「收據草稿」勾選「包含已入帳與已取消」，開啟舊收據補核對。</div>}
     {error&&<p role="alert" className="error">{error}<button className="text-button" onClick={()=>setRefresh(n=>n+1)}>重試</button></p>}
     {loading?<p role="status">正在搜尋商品紀錄…</p>:result&&<>
@@ -37,6 +39,7 @@ export function ProductHistory({currency,onCapture}:{currency:string;onCapture:(
       {!result.items.length?<section className="empty-state panel"><ShoppingBag size={30}/><h2>沒有符合的已核對商品</h2><p>可換用收據原文搜尋，或先核對收據品項。</p></section>:<div className="purchase-list">{result.items.map((item,n)=><article className="panel purchase-card" key={`${item.draft_id}-${n}`}>
         <div className="section-heading"><div><p className="eyebrow">{item.occurred_on} · {item.merchant||'未填商家'}</p><h3>{item.name}</h3></div><span className="phase-tag">{item.currency}</span></div>
         {item.raw_name&&item.raw_name!==item.name&&<p className="footnote">收據原文：{item.raw_name}</p>}
+        {item.product_name&&<p className="footnote">對應商品：{item.product_name}（手動連結）</p>}
         <dl className="purchase-values"><div><dt>數量</dt><dd>{item.quantity??'不明'} {item.unit}</dd></div><div><dt>單價</dt><dd>{item.unit_price??'不明'}</dd></div><div><dt>列金額</dt><dd>{item.line_total??'不明'}</dd></div></dl>
         {item.note&&<p className="footnote">{item.note}</p>}
         <Button variant="secondary" disabled={opening} onClick={()=>void open(item.draft_id)}>查看收據／修正品項</Button>

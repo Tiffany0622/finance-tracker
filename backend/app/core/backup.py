@@ -39,11 +39,16 @@ BACKUP_TABLES = (
     + ATTACHMENT_TABLES
     + ("capture_drafts", "receipt_parse_attempts", "telegram_events", "telegram_cursors")
     + ("receipt_item_reviews", "receipt_items")
+    + ("products", "product_aliases")
 )
 
 
 def attachment_fingerprint(
-    conn: Any, data_dir: Path, legacy: bool = False, capture_only: bool = False
+    conn: Any,
+    data_dir: Path,
+    legacy: bool = False,
+    capture_only: bool = False,
+    items_only: bool = False,
 ) -> str:
     from app.receipts.service import file_path
 
@@ -57,6 +62,7 @@ def attachment_fingerprint(
             else ("capture_drafts", "receipt_parse_attempts", "telegram_events", "telegram_cursors")
         )
         + (() if legacy or capture_only else ("receipt_item_reviews", "receipt_items"))
+        + (() if legacy or capture_only or items_only else ("products", "product_aliases"))
     ):
         for row in conn.execute(
             text(f'SELECT row_to_json(t)::text FROM "{table}" t ORDER BY row_to_json(t)::text')
@@ -162,6 +168,7 @@ def verify_backup(path: Path) -> dict[str, Any]:
         "0002_ledger",
         "0003_receipts",
         "0004_capture",
+        "0005_items",
         SCHEMA_VERSION,
     ):
         raise ValueError("backup_version_unsupported")
@@ -402,18 +409,21 @@ def restore_backup(source: Path, target_url: str, target_data: Path) -> None:
                 "0002_ledger",
                 "0003_receipts",
                 "0004_capture",
+                "0005_items",
                 SCHEMA_VERSION,
             ) and financial_fingerprint(conn) != manifest.get("financial_hash"):
                 raise ValueError("restored_financial_mismatch")
             if manifest["schema_version"] in (
                 "0003_receipts",
                 "0004_capture",
+                "0005_items",
                 SCHEMA_VERSION,
             ) and attachment_fingerprint(
                 conn,
                 target_data,
                 legacy=manifest["schema_version"] == "0003_receipts",
                 capture_only=manifest["schema_version"] == "0004_capture",
+                items_only=manifest["schema_version"] == "0005_items",
             ) != manifest.get("attachment_hash"):
                 raise ValueError("restored_attachment_metadata_mismatch")
         for name, expected in manifest["files"].items():

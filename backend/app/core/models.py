@@ -485,9 +485,30 @@ class ReceiptItemReview(Owned, Base):
     )
 
 
+class Product(Owned, Base):
+    __tablename__ = "products"
+    name: Mapped[str] = mapped_column(String(200))
+    note: Mapped[str] = mapped_column(String(500), default="")
+    revision: Mapped[int] = mapped_column(default=1)
+    __table_args__ = (UniqueConstraint("owner_id", "id"), CheckConstraint("revision > 0"))
+
+
+class ProductAlias(Base):
+    __tablename__ = "product_aliases"
+    owner_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    normalized_name: Mapped[str] = mapped_column(String(200), primary_key=True)
+    product_id: Mapped[uuid.UUID]
+    name: Mapped[str] = mapped_column(String(200))
+    __table_args__ = (
+        ForeignKeyConstraint(["owner_id", "product_id"], ["products.owner_id", "products.id"]),
+        Index("ix_product_aliases_product_id", "product_id"),
+    )
+
+
 class ReceiptItem(Owned, Base):
     __tablename__ = "receipt_items"
     review_id: Mapped[uuid.UUID]
+    product_id: Mapped[uuid.UUID | None]
     line_no: Mapped[int]
     source_line_no: Mapped[int | None]
     raw_name: Mapped[str]
@@ -499,6 +520,7 @@ class ReceiptItem(Owned, Base):
     note: Mapped[str] = mapped_column(String(500))
     __table_args__ = (
         UniqueConstraint("review_id", "line_no"),
+        ForeignKeyConstraint(["owner_id", "product_id"], ["products.owner_id", "products.id"]),
         ForeignKeyConstraint(
             ["owner_id", "review_id"], ["receipt_item_reviews.owner_id", "receipt_item_reviews.id"]
         ),

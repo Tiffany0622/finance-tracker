@@ -217,6 +217,13 @@ XIRR 用投資組合邊界的外部現金流與期末值；帳戶間內部轉帳
 
 ## 9. 商品、價格及搜尋（Phase 5）
 
+下表為完整目標；`0006_products` 已交付的子集如下，其餘欄位／表尚未實作：
+
+- `products`：Owned、name VARCHAR(200)、note VARCHAR(500)、revision > 0；唯一 `(owner_id,id)`。目前只有建立／修改，沒有商品刪除、合併或單位換算。
+- `product_aliases`：`(owner_id,normalized_name)` 複合主鍵，product_id、name；`(owner_id,product_id)` 外鍵指向 products。以獨立表取代目標表的 aliases JSONB，讓資料庫強制同帳本別名不可歧義；canonical name 也占用一列。正規化為 NFKC + 空白收斂 + casefold，key 最多 200 字；每商品最多 30 個額外別名。別名設定可修正，不改原始購買內容。
+- `receipt_items.product_id`：nullable，`(owner_id,product_id)` 複合外鍵。migration 僅加空欄位，不自動連結舊品項。品項連結／解除透過新增 review 與 item rows，保留不可改寫 trigger；確認入帳延續既有已核對連結。
+- 備份納入兩張新表及品項連結的 counts／內容指紋；還原保留 `0003_receipts`／`0004_capture`／`0005_items` 原版指紋規則。跨 schema 升級不改帳務資料。
+
 | 表 | 欄位 | 約束 |
 |---|---|---|
 | `products` | Owned、name、brand?、category、aliases JSONB、base_unit、package_size?、package_unit?、merged_into_id?、revision | 合併不可循環；保留原收據名稱；相似品類不自動合成同 SKU |

@@ -357,8 +357,12 @@ def command(db: Session, owner: uuid.UUID, update: TelegramUpdate, key: str, req
                 f"列金額 {item.line_total if item.line_total is not None else '不明'} {item.currency}\n"
                 f"收據 {str(item.draft_id)[:8]}"
             )
+            if item.product_name:
+                lines.append(f"對應商品：{item.product_name[:100]}（手動連結）")
         if not result.items:
-            lines.append("沒有符合的已核對商品。可到網頁核對舊收據，或換用收據原文搜尋。")
+            lines.append(
+                "沒有符合的已核對商品。可到網頁核對並連結商品，或換用收據原文／完整別名搜尋。"
+            )
         if result.has_more:
             lines.append("僅顯示最近 5 項，完整結果請到網頁「商品紀錄」。")
         if result.pending_receipts:

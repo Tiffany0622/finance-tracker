@@ -10,9 +10,18 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
+from app.capture.products import normalized
 from app.core.auth import Principal, audit, principal
 from app.core.db import engine, transaction
-from app.core.models import CaptureDraft, JournalEntry, ReceiptItem, ReceiptItemReview, Transaction
+from app.core.models import (
+    CaptureDraft,
+    JournalEntry,
+    Product,
+    ProductAlias,
+    ReceiptItem,
+    ReceiptItemReview,
+    Transaction,
+)
 from app.core.schemas import StrictModel
 from app.ledger.routes import protect_writes
 from app.ledger.schemas import Money
@@ -20,6 +29,7 @@ from app.ledger.service import book_lock, fail, number, owned, transaction_outpu
 
 
 class ItemInput(StrictModel):
+    product_id: uuid.UUID | None = None
     source_line_no: int | None = Field(default=None, ge=1, le=200)
     name: str = Field(min_length=1, max_length=500)
     quantity: Money | None = None
@@ -45,6 +55,7 @@ class ItemInput(StrictModel):
 
 
 class ItemOutput(BaseModel):
+    product_id: uuid.UUID | None = None
     source_line_no: int | None
     raw_name: str
     name: str
@@ -75,6 +86,7 @@ class ReviewOutput(BaseModel):
 
 
 class PurchaseOutput(ItemOutput):
+    product_name: str | None
     draft_id: uuid.UUID
     transaction_id: uuid.UUID
     occurred_on: date
@@ -110,6 +122,7 @@ def review_lines(db: Session, review: ReceiptItemReview) -> list[ItemOutput]:
 
 def item_output(line: ReceiptItem) -> ItemOutput:
     return ItemOutput(
+        product_id=line.product_id,
         source_line_no=line.source_line_no,
         raw_name=line.raw_name,
         name=line.name,
@@ -252,6 +265,8 @@ def save_review(
     source = raw.get("items", [])
     lines = []
     for item in body.items:
+        if item.product_id is not None:
+            owned(db, Product, owner, item.product_id)
         if item.source_line_no and item.source_line_no > len(source):
             fail("原始品項連結無效，請重新載入。", "item_source_invalid", 422)
         raw_name = source[item.source_line_no - 1]["raw_name"] if item.source_line_no else ""
@@ -313,11 +328,12 @@ def search(db: Session, owner: uuid.UUID, query: str, offset: int, limit: int = 
     # Literal substring search: '%' and '_' are characters, not SQL wildcards.
     literal = query.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     q = (
-        select(ReceiptItem, d.id, t.id, j.occurred_on, t.merchant, r.currency)
+        select(ReceiptItem, d.id, t.id, j.occurred_on, t.merchant, r.currency, Product.name)
         .join(r, r.id == ReceiptItem.review_id)
         .join(d, d.id == r.draft_id)
         .join(t, t.id == d.confirmed_transaction_id)
         .join(j, j.id == t.current_entry_id)
+        .outerjoin(Product, and_(Product.id == ReceiptItem.product_id, Product.owner_id == owner))
         .where(
             ReceiptItem.owner_id == owner,
             r.owner_id == owner,
@@ -330,6 +346,13 @@ def search(db: Session, owner: uuid.UUID, query: str, offset: int, limit: int = 
             or_(
                 ReceiptItem.name.ilike(f"%{literal}%", escape="\\"),
                 ReceiptItem.raw_name.ilike(f"%{literal}%", escape="\\"),
+                select(ProductAlias.product_id)
+                .where(
+                    ProductAlias.owner_id == owner,
+                    ProductAlias.product_id == ReceiptItem.product_id,
+                    ProductAlias.normalized_name == normalized(query),
+                )
+                .exists(),
             ),
         )
         .order_by(j.occurred_on.desc(), t.id, ReceiptItem.line_no)
@@ -346,8 +369,9 @@ def search(db: Session, owner: uuid.UUID, query: str, offset: int, limit: int = 
                 occurred_on=day,
                 merchant=merchant,
                 currency=currency,
+                product_name=product_name,
             )
-            for i, did, tid, day, merchant, currency in rows[:limit]
+            for i, did, tid, day, merchant, currency, product_name in rows[:limit]
         ],
         has_more=len(rows) > limit,
         pending_receipts=pending,

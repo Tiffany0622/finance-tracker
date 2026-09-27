@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.capture.items import router as item_router
+from app.capture.products import router as product_router
 from app.capture.routes import bridge as capture_bridge_router
 from app.capture.routes import router as capture_router
 from app.core.auth import (
@@ -91,6 +92,7 @@ app.include_router(ledger_router)
 app.include_router(receipts_router)
 app.include_router(capture_router)
 app.include_router(item_router)
+app.include_router(product_router)
 app.include_router(capture_bridge_router)
 
 

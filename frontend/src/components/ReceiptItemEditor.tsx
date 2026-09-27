@@ -3,24 +3,27 @@ import { Plus, X } from 'lucide-react';
 import { api } from '../api/client';
 import type { components } from '../api/schema';
 import { Button } from './ui/button';
+import type { Product } from './ProductCatalog';
 
 type Review = components['schemas']['ReviewOutput'];
 type Item = components['schemas']['ItemOutput'];
 type Draft = components['schemas']['DraftOutput'];
 const message = (e: unknown) => e instanceof Error ? e.message : '品項尚未儲存，請稍後再試。';
-const emptyItem = (): Item => ({source_line_no:null,raw_name:'',name:'',quantity:null,unit_price:null,line_total:null,unit:'',note:''});
+const emptyItem = (): Item => ({product_id:null,source_line_no:null,raw_name:'',name:'',quantity:null,unit_price:null,line_total:null,unit:'',note:''});
 
 export function ReceiptItemEditor({draft,disabled,onDirty,onBusy}:{draft:Draft;disabled:boolean;onDirty:(dirty:boolean)=>void;onBusy:(busy:boolean)=>void}) {
   const [review,setReview]=useState<Review|null>(null),[items,setItems]=useState<Item[]>([]);
   const [dirty,setDirty]=useState(false),[busy,setBusy]=useState(false),[ack,setAck]=useState(false);
   const [error,setError]=useState(''),[notice,setNotice]=useState('');
+  const [products,setProducts]=useState<Product[]>([]),[productError,setProductError]=useState(''),[productRefresh,setProductRefresh]=useState(0);
+  useEffect(()=>{let active=true;void api<Product[]>('/products/catalog').then(p=>{if(active){setProducts(p);setProductError('');}}).catch(e=>{if(active)setProductError(message(e));});return()=>{active=false;};},[productRefresh]);
   const path=`/capture/drafts/${draft.id}/items`;
   useEffect(()=>{let active=true;setReview(null);setError('');setNotice('');setAck(false);
     void api<Review>(path).then(r=>{if(active){setReview(r);setItems(r.items);setDirty(false);onDirty(false);}}).catch(e=>{if(active)setError(message(e));});
     return()=>{active=false;};
   },[path,draft.revision,onDirty]);
   function change(next:Item[]){setItems(next);setDirty(true);onDirty(true);setAck(false);setNotice('');}
-  function field(index:number,key:keyof Item,value:string){change(items.map((i,n)=>n===index?{...i,[key]:['quantity','unit_price','line_total'].includes(key)?value||null:value}:i));}
+  function field(index:number,key:keyof Item,value:string){change(items.map((i,n)=>n===index?{...i,[key]:['quantity','unit_price','line_total','product_id'].includes(key)?value||null:value}:i));}
   async function reload(){if(dirty&&!window.confirm('重新載入會捨棄尚未儲存的品項修改，確定繼續？'))return;
     try{const r=await api<Review>(path);setReview(r);setItems(r.items);setDirty(false);onDirty(false);setAck(false);setError('');setNotice('');}catch(e){setError(message(e));}}
   async function save(event:FormEvent){event.preventDefault();if(!review)return;setBusy(true);onBusy(true);setError('');setNotice('');
@@ -31,12 +34,16 @@ export function ReceiptItemEditor({draft,disabled,onDirty,onBusy}:{draft:Draft;d
     <div className="section-heading"><h3 id="item-review-title">品項核對／修正</h3><span>{review?{unreviewed:'尚未核對',reviewed:'已核對',stale:'需要重新核對'}[review.status]:'載入中'}</span></div>
     <p className="footnote">先儲存上方的幣別與帳務修改，再核對品項。這裡只保存商品明細，不會增加支出或變更帳務總額。</p>
     <p className="footnote">價格單位：{review?.currency||'請先選擇幣別'}。不明數值留白；列金額照收據填寫，可為折扣負值，稅與小費不會自動攤入。只有單價明確時才填單價。</p>
+    <p className="footnote">可手動選擇對應商品，之後用它的名稱或別名搜尋。請先在「商品紀錄 → 管理商品名稱與別名」建立商品；不連結也能搜尋品名。</p>
+    {productError&&<p role="alert" className="error">{productError}</p>}
+    <button type="button" className="text-button" disabled={busy} onClick={()=>setProductRefresh(n=>n+1)}>更新可選商品</button>
     {review?.warnings.map((w,i)=><p className="form-hint" key={i}>{w}</p>)}
     {review&&<form onSubmit={save}><fieldset disabled={disabled||busy||!review.editable||!review.currency}>
       <div className="item-edit-list">{items.map((item,index)=><div className="item-edit-card" key={index}>
         <div className="section-heading"><strong>品項 {index+1}</strong><button type="button" aria-label={`移除品項 ${index+1}`} onClick={()=>change(items.filter((_,n)=>n!==index))}><X size={16}/></button></div>
         {item.raw_name&&<p className="footnote">辨識原文：{item.raw_name}</p>}
         <label>品名 {index+1}<input required maxLength={500} value={item.name} onChange={e=>field(index,'name',e.target.value)}/></label>
+        <label>對應商品 {index+1}<select value={item.product_id??''} onChange={e=>field(index,'product_id',e.target.value)}><option value="">未連結（僅依品名搜尋）</option>{item.product_id&&!products.some(p=>p.id===item.product_id)&&<option value={item.product_id}>已連結商品（清單尚未載入）</option>}{products.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
         <div className="form-grid"><label>數量 {index+1}<input inputMode="decimal" placeholder="不明可留白" value={item.quantity??''} onChange={e=>field(index,'quantity',e.target.value)}/></label><label>單位／規格 {index+1}<input maxLength={40} placeholder="例如：盒／500g" value={item.unit} onChange={e=>field(index,'unit',e.target.value)}/></label></div>
         <div className="form-grid"><label>單價 {index+1}<input inputMode="decimal" placeholder="不明可留白" value={item.unit_price??''} onChange={e=>field(index,'unit_price',e.target.value)}/></label><label>列金額 {index+1}<input inputMode="decimal" placeholder="照收據填寫" value={item.line_total??''} onChange={e=>field(index,'line_total',e.target.value)}/></label></div>
         <label>品項備註 {index+1}<input maxLength={500} placeholder="例如：折扣、規格待確認" value={item.note} onChange={e=>field(index,'note',e.target.value)}/></label>

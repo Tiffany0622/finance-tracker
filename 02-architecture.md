@@ -319,6 +319,10 @@ Bot 的重新辨識／下載重試與 Web 共用 `service.retry_draft()`。Bot �
 
 ### 品項核對 → 商品紀錄（2026-09-25）
 
+2026-09-26 延伸：`capture/products.py` 提供 owner 限定的商品名稱／別名管理 API，writer 使用 maintenance transaction 與 BookSettings 鎖；建立有 Idempotency-Key，修改有 expected_revision。別名採 NFKC、空白收斂、casefold，完整 key 比對，canonical name 也佔用唯一 key。使用者在品項核對時明確指定 product_id，透過新增 review 保存；未選擇不做自動分類。商品設定更名不改收據品名、規格、原始解析或 journal。
+
+Web 與 Telegram 的查詢共用 `items.search`：既有 literal substring OR owner 限定的商品別名 EXISTS，不展開成多筆 JOIN 結果；仍只讀最新且吻合草稿／交易版本的品項。名稱與別名編輯後即時生效；商品備註僅為管理說明，尚未加入搜尋。此批沒有向量索引或模型服務變動。證據見 [product-aliases.md](docs/verification/product-aliases.md)。
+
 新增 `capture.items` 共用服務與 `0005_items` 遷移。AI 原始 `parsed` / parse attempt 不改寫；人工核對以 append-only review + item rows 保存原始解析快照、來源列、修正值與版本。每次寫入取得 maintenance shared lock 與 owner BookSettings lock，同時核對 draft、item review、正式交易 revision；舊畫面不能覆蓋新值。
 
 未入帳的已核對品項只保存在草稿。使用者確認整筆入帳時，僅將仍有效的核對版本複製至該筆交易 revision，不另外增加 posting。人工更正品項也不呼叫 ledger 寫入。草稿修改、重辨識或正式交易修訂會使舊核對失效，但仍保留人工值供再核對；作廢／取消來源不可再核對。舊收據 GET 只顯示 AI 候選，不批次將它們標成已核對。

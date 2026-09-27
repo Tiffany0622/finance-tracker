@@ -66,6 +66,12 @@
 .item-edit-card { background: #f6f7f3; border: 1px solid #e3e5df; border-radius: 12px; padding: 14px; min-width: 0; }
 .item-edit-card .section-heading { margin: 0 0 8px; }
 .item-ack { margin: 16px 0; }
+.catalog-details { margin: 20px 0; }
+.catalog-details summary { cursor: pointer; padding: 14px 0; font-weight: 600; }
+.product-catalog fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.product-catalog label, .product-catalog .footnote { overflow-wrap: anywhere; }
+.product-catalog textarea { display: block; font: inherit; font-size: 14px; width: 100%; margin-top: 9px; padding: 12px; border: 1px solid #dce3d6; border-radius: 6px; resize: vertical; }
+@media (max-width: 700px) { .product-catalog .form-actions { flex-wrap: wrap; } .product-catalog input, .product-catalog select, .product-catalog textarea { font-size: 16px; } }
 .item-review .footnote, .purchase-card p { overflow-wrap: anywhere; }
 .product-search { display: flex; align-items: end; gap: 12px; }
 .product-search label { flex: 1; margin: 0; min-width: 0; }

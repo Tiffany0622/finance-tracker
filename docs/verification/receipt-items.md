@@ -35,4 +35,6 @@ Docker arm64 API / Web build 通過。取得既有 autostart lock、建立 maint
 
 ## 保留待辦
 
+2026-09-26 續作已補上人工商品主檔／別名與品項連結，見 [product-aliases.md](product-aliases.md)。下段保留本批 2026-09-25 交付時的範圍紀錄。
+
 尚無商品主檔、別名／多語同義詞、備註混合搜尋、向量／照片搜尋、規格換算、跨幣比價、品項匯出與退款價格淨額。列金額依收據保存，稅與小費不另分攤。大量資料 p95、實際 iPhone Safari／Telegram 查詢仍待實機驗收；Chrome 手機尺寸與 fake Telegram 整合不能替代。此次沒有更換 AI 模型、提升 OCR 品質或改用雲端。D2-03 與 Phase 5 保持部分完成。

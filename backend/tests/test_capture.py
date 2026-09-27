@@ -573,6 +573,10 @@ def test_backup_restore_preserves_unposted_receipt_and_parse_history(
     complete(logged_in, headers, next_job(logged_in, headers), parsed=PARSED)
     row = edit(logged_in, get_draft(logged_in, row), currency="USD")
     state = logged_in.get(f"/api/v1/capture/drafts/{row['id']}/items").json()
+    from test_products import create
+
+    product = create(logged_in).json()
+    state["items"][0]["product_id"] = product["id"]
     reviewed = logged_in.put(
         f"/api/v1/capture/drafts/{row['id']}/items",
         json={
@@ -587,6 +591,8 @@ def test_backup_restore_preserves_unposted_receipt_and_parse_history(
     manifest = verify_backup(backup)
     assert manifest["counts"]["receipt_item_reviews"] == 1
     assert manifest["counts"]["receipt_items"] == 2
+    assert manifest["counts"]["products"] == 1
+    assert manifest["counts"]["product_aliases"] == 3
     assert (
         manifest["counts"]["capture_drafts"] == 1
         and manifest["counts"]["receipt_parse_attempts"] == 1
@@ -610,6 +616,13 @@ def test_backup_restore_preserves_unposted_receipt_and_parse_history(
 
             assert review_output(db, draft).status == "reviewed"
             assert review_output(db, draft).items[0].raw_name == "蘋果 Apples"
+            assert str(review_output(db, draft).items[0].product_id) == product["id"]
+            from app.capture.products import output
+            from app.core.models import Product
+
+            assert (
+                output(db, db.get(Product, uuid.UUID(product["id"]))).aliases == product["aliases"]
+            )
             assert (
                 db.scalar(
                     select(func.count())
