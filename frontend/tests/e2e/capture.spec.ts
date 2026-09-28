@@ -33,6 +33,24 @@ test('receipt items survive review, confirm once, search history and correct pos
   await page.screenshot({path:info.outputPath('product-catalog.png'),fullPage:true});
   await page.getByRole('button',{name:'收據草稿',exact:true}).click();
   await expect(page.getByText('辨識尚未啟用',{exact:true})).toBeVisible();
+  // Synthetic parsed fixture: show the origin of a prefill and preserve a manual override.
+  const currencyMerchant=`合成幣別測試 ${info.project.name}`;
+  await page.locator('.draft-card').filter({hasText:currencyMerchant}).click();
+  const currencyDialog=page.getByRole('dialog',{name:'核對收據草稿'});
+  await expect(currencyDialog.getByRole('combobox',{name:'收據幣別',exact:true})).toHaveValue('USD');
+  await expect(currencyDialog.getByRole('note')).toContainText('地區推測');
+  await expect(currencyDialog.getByRole('note')).toContainText('Palo Alto CA 94301');
+  await currencyDialog.getByRole('combobox',{name:'收據幣別',exact:true}).selectOption('TWD');
+  await expect(currencyDialog.getByLabel('金額',{exact:true})).toHaveValue('10.50');
+  await currencyDialog.getByRole('button',{name:'儲存草稿修改'}).click();
+  await expect(currencyDialog.getByText('草稿已儲存，請核對後確認入帳。')).toBeVisible();
+  await currencyDialog.getByRole('button',{name:'完成／關閉'}).click();
+  await page.locator('.draft-card').filter({hasText:currencyMerchant}).click();
+  await expect(currencyDialog.getByRole('combobox',{name:'收據幣別',exact:true})).toHaveValue('TWD');
+  await expect(currencyDialog.getByRole('note')).toContainText('初次辨識');
+  await expect(currencyDialog.getByLabel('金額',{exact:true})).toHaveValue('10.50');
+  await page.screenshot({path:info.outputPath('currency-inference.png')});
+  await currencyDialog.getByRole('button',{name:'完成／關閉'}).click();
   await page.locator('input[type=file]').setInputFiles(path.resolve('tests/fixtures/receipt.heic'));
   await page.getByRole('button',{name:'上傳並建立草稿'}).click();
   const dialog=page.getByRole('dialog',{name:'核對收據草稿'});

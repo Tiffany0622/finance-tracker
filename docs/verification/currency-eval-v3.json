@@ -1,0 +1,170 @@
+{
+  "model": "qwen3-vl:8b-instruct",
+  "prompt_version": 3,
+  "at": "2026-09-28T00:29:21.529603+00:00",
+  "results": [
+    {
+      "case": "explicit-usd",
+      "repeat": 1,
+      "mismatches": {},
+      "evidence": {
+        "currency": "USD",
+        "currency_text": "US$",
+        "merchant_address": null
+      },
+      "decision": {
+        "currency": "USD",
+        "basis": "explicit"
+      },
+      "seconds": 25.37,
+      "passed": true
+    },
+    {
+      "case": "us-address-bare-dollar",
+      "repeat": 1,
+      "mismatches": {
+        "currency": {
+          "expected": null,
+          "actual": "USD"
+        }
+      },
+      "evidence": {
+        "currency": "USD",
+        "currency_text": "Subtotal $10.00\nTax $0.50\nTip $0.00\nDiscount $0.00\nAmount Paid $10.50",
+        "merchant_address": "123 Example St\nPalo Alto, CA 94301"
+      },
+      "decision": {
+        "currency": "USD",
+        "basis": "address"
+      },
+      "seconds": 12.91,
+      "passed": false
+    },
+    {
+      "case": "taiwan-address",
+      "repeat": 1,
+      "mismatches": {},
+      "evidence": {
+        "currency": null,
+        "currency_text": "實付 $105",
+        "merchant_address": "台北市大安區信義路三段100號"
+      },
+      "decision": {
+        "currency": "TWD",
+        "basis": "address"
+      },
+      "seconds": 12.1,
+      "passed": true
+    },
+    {
+      "case": "canada-english-dollar",
+      "repeat": 1,
+      "mismatches": {
+        "currency": {
+          "expected": null,
+          "actual": "USD"
+        }
+      },
+      "evidence": {
+        "currency": "USD",
+        "currency_text": "Subtotal $10.00\nTax $0.50\nTip $0.00\nDiscount $0.00\nAmount Paid $10.50",
+        "merchant_address": "100 Test St\nVancouver BC V6B 1A1, Canada"
+      },
+      "decision": {
+        "currency": null,
+        "basis": "unknown"
+      },
+      "seconds": 13.32,
+      "passed": false
+    },
+    {
+      "case": "australia-english-dollar",
+      "repeat": 1,
+      "mismatches": {
+        "currency": {
+          "expected": null,
+          "actual": "AUD"
+        },
+        "currency_decision": {
+          "expected": {
+            "currency": null,
+            "basis": "unknown"
+          },
+          "actual": {
+            "currency": null,
+            "basis": "unsupported"
+          }
+        }
+      },
+      "evidence": {
+        "currency": "AUD",
+        "currency_text": "Subtotal $10.00\nTax $0.50\nTip $0.00\nDiscount $0.00\nAmount Paid $10.50",
+        "merchant_address": "100 Test St\nPerth WA 6000, Australia"
+      },
+      "decision": {
+        "currency": null,
+        "basis": "unsupported"
+      },
+      "seconds": 14.29,
+      "passed": false
+    },
+    {
+      "case": "english-only-dollar",
+      "repeat": 1,
+      "mismatches": {
+        "currency": {
+          "expected": null,
+          "actual": "USD"
+        }
+      },
+      "evidence": {
+        "currency": "USD",
+        "currency_text": "Subtotal $10.00\nTax $0.50\nTip $0.00\nDiscount $0.00\nAmount Paid $10.50",
+        "merchant_address": null
+      },
+      "decision": {
+        "currency": null,
+        "basis": "unknown"
+      },
+      "seconds": 12.76,
+      "passed": false
+    },
+    {
+      "case": "explicit-twd",
+      "repeat": 1,
+      "mismatches": {
+        "currency": {
+          "expected": "TWD",
+          "actual": "NT$"
+        }
+      },
+      "evidence": {
+        "currency": "NT$",
+        "currency_text": "實付 NT$105",
+        "merchant_address": null
+      },
+      "decision": {
+        "currency": "TWD",
+        "basis": "explicit"
+      },
+      "seconds": 11.38,
+      "passed": false
+    },
+    {
+      "case": "conflicting-currencies",
+      "repeat": 1,
+      "mismatches": {},
+      "evidence": {
+        "currency": "USD",
+        "currency_text": "Amount Paid USD 10.50 / TWD 330",
+        "merchant_address": null
+      },
+      "decision": {
+        "currency": null,
+        "basis": "conflict"
+      },
+      "seconds": 16.66,
+      "passed": true
+    }
+  ]
+}

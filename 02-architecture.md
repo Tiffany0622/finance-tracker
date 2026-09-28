@@ -311,6 +311,16 @@ Web 與 Bot 共用草稿、保存圖片與 ledger service；AI 只輸出型別�
 
 `scripts/evaluate-local-ai.py` 用版本控制的中英合成圖片獨立量測本機模型，沒有 DB 或 Telegram 寫入；模型猜錯仍回報失敗，不以應用層防護偽裝成 OCR 正確。品質與效能紀錄見 [receipt-quality.md](docs/verification/receipt-quality.md)。
 
+### 幣別文字與地址線索（提示版本 3，2026-09-27）
+
+本批依使用者要求擴充上方版本 2 政策。新工作固定 prompt_version=3、JSON schema_version=2，要求複製 currency_text（付款／金額旁貨幣文字，保留衝突幣別）及 merchant_address（商家實際地址，排除顧客／配送／發卡方地址），不得補寫未印出的國家；版本 1／2 的排隊工作仍使用原提示與原政策。提供器針對舊版本移除新欄位，新版結構化 schema 要求欄位存在但允許 null。
+
+`capture/currency.py` 決定草稿預填：原始使用者文字與模型讀取的收據貨幣引文先比對，只有唯一且支援的明確幣別才採用；衝突／不支援則待選。沒有明確貨幣時，採城市＋美國州碼＋ZIP 或具門牌街道的美國國別線索；台灣採縣市＋路街＋門牌，或具門牌街道的 Taiwan 線索。排除已知非美國／台灣國別與相衝突的地址；不使用語言、品牌或帳戶幣別猜測。這是有限格式規則，不是全球地址驗證或定位服務。
+
+純文字模式只接受原始文字中可找到的模型引文／地址；照片模式使用模型讀取結果，沒有第二套 OCR 或外部地理服務交叉核對。原始模型 currency 即使猜 USD，也不能單獨成為預填依據；未支援的模型幣別會阻止地址推定。結果與理由保存於草稿 warnings 並顯示於 Telegram 與 Web，明示是「初次辨識」，人工更改後不再重新套用。所有預填仍需確認提醒、帳戶幣別一致及原 ledger service 才能入帳，金額不變。
+
+Lease／revision 防護、原始 parse attempt 與人工更正保留；不新增模型請求、資料表或外部服務。實測區分原始模型正確率與最終預填效果，見 [currency-inference.md](docs/verification/currency-inference.md)。
+
 ### Telegram 核對與重試（2026-09-25）
 
 待確認卡片顯示原始小計／稅／小費／折扣，未知顯示「不明」，明確零值保留；與人工修正後的記帳金額分開標示。幣別按鈕明確選 USD / TWD，只修改 proposal.currency，不換算金額、不變更帳戶或原始 parsed。關閉草稿不提供修改按鈕；處理中僅提供查看進度與取消，完成後另發可核對卡片。

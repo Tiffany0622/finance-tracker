@@ -1,0 +1,50 @@
+[
+  {
+    "id": "explicit-usd",
+    "lines": ["SYNTHETIC TEST RECEIPT", "Example Cafe", "2026-02-03", "Tea 1 x 10.00 10.00", "Subtotal 10.00", "Tax 0.50", "Tip 0.00", "Discount 0.00", "Amount Paid US$10.50"],
+    "expected": {"currency": "USD", "amount": "10.50"},
+    "expected_currency": {"currency": "USD", "basis": "explicit"}
+  },
+  {
+    "id": "us-address-bare-dollar",
+    "lines": ["SYNTHETIC TEST RECEIPT", "Example Cafe", "123 Example St", "Palo Alto, CA 94301", "2026-02-03", "Tea 1 x 10.00 10.00", "Subtotal $10.00", "Tax $0.50", "Tip $0.00", "Discount $0.00", "Amount Paid $10.50"],
+    "expected": {"currency": null, "amount": "10.50"},
+    "expected_currency": {"currency": "USD", "basis": "address"}
+  },
+  {
+    "id": "taiwan-address",
+    "lines": ["合成測試收據", "範例商店", "台北市大安區信義路三段100號", "2026-02-03", "茶葉 1 x 100 100", "小計 100", "稅金 5", "小費 0", "折扣 0", "實付 $105"],
+    "expected": {"currency": null, "amount": "105"},
+    "expected_currency": {"currency": "TWD", "basis": "address"}
+  },
+  {
+    "id": "canada-english-dollar",
+    "lines": ["SYNTHETIC TEST RECEIPT", "Example Cafe", "100 Test St", "Vancouver BC V6B 1A1, Canada", "2026-02-03", "Tea 1 x 10.00 10.00", "Subtotal $10.00", "Tax $0.50", "Tip $0.00", "Discount $0.00", "Amount Paid $10.50"],
+    "expected": {"currency": null, "amount": "10.50"},
+    "expected_currency": {"currency": null, "basis": "unknown"}
+  },
+  {
+    "id": "australia-english-dollar",
+    "lines": ["SYNTHETIC TEST RECEIPT", "Example Cafe", "100 Test St", "Perth WA 6000, Australia", "2026-02-03", "Tea 1 x 10.00 10.00", "Subtotal $10.00", "Tax $0.50", "Tip $0.00", "Discount $0.00", "Amount Paid $10.50"],
+    "expected": {"currency": null, "amount": "10.50"},
+    "expected_currency": {"currency": null, "basis": "unknown"}
+  },
+  {
+    "id": "english-only-dollar",
+    "lines": ["SYNTHETIC TEST RECEIPT", "Example Cafe", "2026-02-03", "Tea 1 x 10.00 10.00", "Subtotal $10.00", "Tax $0.50", "Tip $0.00", "Discount $0.00", "Amount Paid $10.50"],
+    "expected": {"currency": null, "amount": "10.50"},
+    "expected_currency": {"currency": null, "basis": "unknown"}
+  },
+  {
+    "id": "explicit-twd",
+    "lines": ["合成測試收據", "範例商店", "2026-02-03", "茶葉 1 x 100 100", "小計 100", "稅金 5", "小費 0", "折扣 0", "實付 NT$105"],
+    "expected": {"currency": "TWD", "amount": "105"},
+    "expected_currency": {"currency": "TWD", "basis": "explicit"}
+  },
+  {
+    "id": "conflicting-currencies",
+    "lines": ["SYNTHETIC TEST RECEIPT", "Example Cafe", "2026-02-03", "Tea 1 x 10.00 10.00", "Subtotal 10.00", "Tax 0.50", "Tip 0.00", "Discount 0.00", "Amount Paid USD 10.50 / TWD 330"],
+    "expected": {},
+    "expected_currency": {"currency": null, "basis": "conflict"}
+  }
+]

@@ -75,7 +75,11 @@ def show_draft(db: Session, row: CaptureDraft, key: str) -> None:
                 ]
             )
         )
-        if not p.currency and row.parsed.get("currency"):
+        if (
+            not p.currency
+            and row.parsed.get("currency")
+            and not any(w.startswith("幣別判斷：") for w in row.warnings)
+        ):
             text += f"\nAI 建議幣別：{row.parsed['currency']}，請核對後選擇。"
     if row.warnings:
         text += "\n提醒：" + "；".join(row.warnings)

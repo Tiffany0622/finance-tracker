@@ -24,6 +24,13 @@ def parse(
         raise RemoteError("model_not_configured")
     encoded = base64.b64encode(image).decode() if image else None
     schema = ParsedReceipt.model_json_schema()
+    evidence_fields = ("currency_text", "merchant_address")
+    for field in evidence_fields:
+        if prompt_version < 3:
+            schema["properties"].pop(field)
+        else:
+            schema["properties"][field].pop("default", None)
+            schema["required"].append(field)
     try:
         prompt = receipt_prompt(prompt_version)
     except ValueError:
@@ -50,6 +57,13 @@ def parse(
                 "Null unless USD/US$ or TWD/NT$ or a currency name is explicitly printed. "
                 "A bare $ and a US address do not identify currency."
             )
+            if prompt_version >= 3:
+                schema["properties"]["currency_text"]["description"] = (
+                    "Verbatim printed total/payment currency line(s), including conflicting currencies; null if absent."
+                )
+                schema["properties"]["merchant_address"]["description"] = (
+                    "Verbatim printed seller address, including ONLY printed city/state/postcode/country; never infer country."
+                )
             prompt += "\nJSON schema:\n" + json.dumps(schema, ensure_ascii=False)
         response = request_json(
             ollama_url.rstrip("/") + "/api/chat",

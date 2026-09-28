@@ -106,7 +106,11 @@ def test_review_confirm_search_correct_and_remove_preserve_raw_and_ledger(logged
     )
     assert search(logged_in, "APPLES")["items"] == found
     assert search(logged_in)["pending_receipts"] == 0
-    assert get_draft(logged_in, row)["parsed"] == PARSED
+    assert get_draft(logged_in, row)["parsed"] == {
+        **PARSED,
+        "currency_text": None,
+        "merchant_address": None,
+    }
     after = balances(logged_in)
     state = item_state(logged_in, posted)
     state["items"][0]["unit_price"] = None

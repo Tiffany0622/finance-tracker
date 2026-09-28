@@ -106,7 +106,7 @@ class Bridge:
                         openai_key=self.openai_key,
                         prompt_version=payload.get("prompt_version", 1),
                     )
-                    body["parsed"] = result.model_dump(mode="json")
+                    body["parsed"] = result.model_dump(mode="json", exclude_unset=True)
                 elif job["kind"] == "telegram_download":
                     data = self.download(payload["file_id"])
                     request_bytes(

@@ -16,8 +16,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
+from app.capture.currency import decide  # noqa: E402
 from app.capture.prompts import PROMPT_VERSION  # noqa: E402
 from app.capture.providers import parse  # noqa: E402
+from app.capture.schemas import ParsedReceipt  # noqa: E402
 from app.capture.transport import RemoteError  # noqa: E402
 
 MONEY_FIELDS = {"amount", "subtotal", "tax", "tip", "discount"}
@@ -26,7 +28,12 @@ MONEY_FIELDS = {"amount", "subtotal", "tax", "tip", "discount"}
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", default="qwen3-vl:8b-instruct")
-    parser.add_argument("--prompt-version", type=int, choices=[1, 2], default=PROMPT_VERSION)
+    parser.add_argument("--prompt-version", type=int, choices=[1, 2, 3], default=PROMPT_VERSION)
+    parser.add_argument(
+        "--fixtures",
+        type=Path,
+        default=ROOT / "backend/tests/fixtures/receipt-eval.json",
+    )
     parser.add_argument(
         "--font", type=Path, default=Path("/System/Library/Fonts/STHeiti Medium.ttc")
     )
@@ -38,7 +45,7 @@ def main():
     if "cloud" in args.model.lower():
         parser.error("此評估僅使用已下載的本機模型。")
     font = ImageFont.truetype(str(args.font), 32)
-    cases = json.loads((ROOT / "backend/tests/fixtures/receipt-eval.json").read_text())
+    cases = json.loads(args.fixtures.read_text())
     report = {
         "model": args.model,
         "prompt_version": args.prompt_version,
@@ -74,6 +81,22 @@ def main():
                         result["mismatches"][key] = {
                             "expected": expected,
                             "actual": actual,
+                        }
+                if "expected_currency" in case:
+                    decision = decide(ParsedReceipt.model_validate(parsed), "", has_image=True)
+                    result["evidence"] = {
+                        k: parsed[k] for k in ("currency", "currency_text", "merchant_address")
+                    }
+                    result["decision"] = {
+                        "currency": decision.currency,
+                        "basis": decision.basis,
+                    }
+                    expected = case["expected_currency"]
+                    result["currency_prefill_matches"] = decision.currency == expected["currency"]
+                    if result["decision"] != expected:
+                        result["mismatches"]["currency_decision"] = {
+                            "expected": expected,
+                            "actual": result["decision"],
                         }
             except RemoteError as error:
                 result["error"] = error.code

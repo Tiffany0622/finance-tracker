@@ -358,3 +358,9 @@ ReportSnapshot 以不可變 JSON document 保存完整 metadata／指標／明�
 分類候選即時由既有 categories、transactions 的目前 journal entry 分攤、capture_drafts 與有效 receipt_item_reviews / receipt_items 產生，不新增資料表或遷移；正式 schema 保持 `0006_products`。候選含 category_id（新名稱為 null）、name、source、reason 與 draft_revision，僅是暫時預覽，不寫入 parsed、parse attempts 或原始品項。
 
 明確建立建議名稱時，沿用 categories 的 owner、兩層結構、類型及冪等驗證。明確選用後仍須儲存，才會寫入既有 proposal.category_id / splits 並增加草稿 revision；確認入帳仍經原 ledger service。建議本身不建立交易、posting、歷史商家規則或額外備份內容；未來規則引擎／商家預設仍未實作。
+
+## 2026-09-27：收據解析 JSON 版本 2
+
+DB schema 仍為 `0006_products`，沒有 migration。ParsedReceipt 新增可空 currency_text（最多 300 字）與 merchant_address（最多 500 字），保存在既有 result／parsed JSONB；舊 JSON 缺欄位視為 null，不回填既有資料。寫入採 exclude_unset，避免因讀取舊模型而補寫空欄位。原始模型 currency 保留，即使最終預填不同也不改成規則判斷值。
+
+新解析工作保存 prompt_version=3、schema_version=2，parse attempt 依工作版本保存；舊工作缺值維持 1，版本 2 工作保持舊幣別策略。最後判斷只寫草稿 proposal.currency 與初次辨識 warnings，由既有 revision／lease 防護控制；人工選幣別、金額、帳戶及確認仍使用原欄位與交易邊界。不批次更新既有草稿、品項核對或正式帳務。

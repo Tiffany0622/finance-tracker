@@ -48,7 +48,7 @@ def test_currency_buttons_preserve_raw_parse_and_require_matching_account(logged
     before = balances(logged_in)
     row, _, message = parsed_draft(logged_in, headers)
     assert "小計 10.00" in message["text"] and "小費 0" in message["text"]
-    assert "AI 建議幣別：USD" in message["text"]
+    assert "幣別判斷：沒有足夠" in message["text"]
     assert row["proposal"]["currency"] is None
     click(logged_in, headers, 2, message, "選擇幣別")
     menu = sent("tg:12345:2")

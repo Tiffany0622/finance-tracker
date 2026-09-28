@@ -1203,6 +1203,10 @@ export interface components {
             occurred_on: string | null;
             /** Currency */
             currency: string | null;
+            /** Currency Text */
+            currency_text?: string | null;
+            /** Merchant Address */
+            merchant_address?: string | null;
             /** Amount */
             amount: string | null;
             /** Subtotal */

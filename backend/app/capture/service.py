@@ -27,7 +27,8 @@ from app.ledger.schemas import TransactionInput
 from app.ledger.service import book_lock, create_transaction, fail, owned
 from app.receipts import service as files
 
-from .prompts import PROMPT_VERSION, explicit_currency
+from .currency import decide
+from .prompts import PARSE_SCHEMA_VERSION, PROMPT_VERSION, explicit_currency
 from .schemas import DraftAction, DraftEdit, DraftOutput, ParsedReceipt, Proposal
 
 
@@ -84,6 +85,7 @@ def queue_parse(db: Session, row: CaptureDraft) -> None:
             "provider": cfg.capture_provider,
             "model": cfg.capture_model,
             "prompt_version": PROMPT_VERSION,
+            "schema_version": PARSE_SCHEMA_VERSION,
         },
     )
 
@@ -277,7 +279,7 @@ def retry_draft(
     return row
 
 
-def validate_parsed(result: ParsedReceipt) -> list[str]:
+def validate_parsed(result: ParsedReceipt, *, check_currency: bool = True) -> list[str]:
     warnings = []
     for key, label in [
         ("merchant", "商家"),
@@ -285,11 +287,11 @@ def validate_parsed(result: ParsedReceipt) -> list[str]:
         ("currency", "幣別"),
         ("amount", "總額"),
     ]:
-        if getattr(result, key) is None:
+        if getattr(result, key) is None and (key != "currency" or check_currency):
             warnings.append(f"無法確定{label}，請手動核對。")
     if result.amount is not None and Decimal(result.amount) <= 0:
         warnings.append("辨識總額不是正數，請修正。")
-    if result.currency not in {"USD", "TWD", None}:
+    if check_currency and result.currency not in {"USD", "TWD", None}:
         warnings.append("收據幣別目前不支援，請確認實際帳戶扣款幣別與金額。")
     if result.subtotal is None:
         warnings.append("未取得小計，無法驗算品項與總額。")
@@ -351,7 +353,8 @@ def apply_parse(db: Session, job: Job, result: ParsedReceipt | None, error: str 
                 provider=job.payload["provider"],
                 model=job.payload["model"],
                 prompt_version=job.payload.get("prompt_version", 1),
-                result=result.model_dump(mode="json") if result else None,
+                schema_version=job.payload.get("schema_version", 1),
+                result=result.model_dump(mode="json", exclude_unset=True) if result else None,
                 error_code=error,
             )
         )
@@ -371,13 +374,27 @@ def apply_parse(db: Session, job: Job, result: ParsedReceipt | None, error: str 
     proposal.merchant = result.merchant or ""
     currency = result.currency
     prompt_version = job.payload.get("prompt_version", 1)
-    if prompt_version >= 2:
+    decision = None
+    if prompt_version >= 3:
+        has_image = (
+            db.scalar(
+                select(ReceiptAttachment.attachment_id)
+                .where(ReceiptAttachment.receipt_id == row.receipt_id)
+                .limit(1)
+            )
+            is not None
+        )
+        decision = decide(result, row.source_text, has_image=has_image)
+        currency = decision.currency
+    elif prompt_version == 2:
         currency = currency if currency == explicit_currency(row.source_text) else None
     proposal.currency = currency if currency in {"USD", "TWD"} else None  # type: ignore[assignment]
     row.proposal = proposal.model_dump(mode="json")
-    row.parsed = result.model_dump(mode="json")
-    row.warnings = validate_parsed(result)
-    if prompt_version >= 2 and result.currency and proposal.currency is None:
+    row.parsed = result.model_dump(mode="json", exclude_unset=True)
+    row.warnings = validate_parsed(result, check_currency=prompt_version < 3)
+    if decision:
+        row.warnings = [decision.warning, *row.warnings]
+    elif prompt_version == 2 and result.currency and proposal.currency is None:
         row.warnings = [
             *row.warnings,
             "AI 幣別僅供參考，請對照收據手動選擇；不以地址或 $ 符號推定。",

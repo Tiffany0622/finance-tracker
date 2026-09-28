@@ -184,7 +184,7 @@ def test_ocr_validated_but_no_account_invented_or_ledger_write(logged_in, monkey
     assert result["parsed"]["items"][0]["raw_name"] == "蘋果 Apples"
     assert result["proposal"]["currency"] is None
     assert result["parsed"]["currency"] == "USD"
-    assert result["warnings"] == ["AI 幣別僅供參考，請對照收據手動選擇；不以地址或 $ 符號推定。"]
+    assert len(result["warnings"]) == 1 and "沒有足夠" in result["warnings"][0]
     assert balances(logged_in) == before
     assert action(logged_in, result).status_code == 422
     with Session(engine()) as db:
@@ -851,7 +851,7 @@ def test_legacy_parse_job_retains_prompt_version_and_history(logged_in, monkeypa
             db.scalars(select(ReceiptParseAttempt).order_by(ReceiptParseAttempt.created_at))
         )
         assert [a.prompt_version for a in attempts] == [1, PROMPT_VERSION]
-        assert [a.schema_version for a in attempts] == [1, 1]
+        assert [a.schema_version for a in attempts] == [1, 2]
         assert [a.result["subtotal"] for a in attempts] == ["10.00", "9.99"]
         assert db.scalar(select(func.count()).select_from(Transaction)) == before
 
@@ -868,13 +868,17 @@ def test_legacy_parse_job_retains_prompt_version_and_history(logged_in, monkeypa
         ("USD", "USD 10 / TWD 300", None),
     ],
 )
-def test_currency_requires_explicit_user_input(
+def test_v2_currency_requires_explicit_user_input(
     logged_in, monkeypatch, currency, source_text, accepted
 ):
     configure(monkeypatch)
     setup(logged_in)
     headers = auth()
     row = image(logged_in)
+    with transaction() as db:
+        pending = db.get(CaptureDraft, uuid.UUID(row["id"]))
+        old_job = db.get(Job, pending.job_id)
+        old_job.payload = {**old_job.payload, "prompt_version": 2, "schema_version": 1}
     job = next_job(logged_in, headers)
     with transaction() as db:
         db.get(CaptureDraft, uuid.UUID(row["id"])).source_text = source_text

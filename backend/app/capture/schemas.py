@@ -19,6 +19,8 @@ class ParsedReceipt(StrictModel):
     merchant: str | None = Field(max_length=200)
     occurred_on: date | None
     currency: str | None = Field(max_length=12)
+    currency_text: str | None = Field(default=None, max_length=300)
+    merchant_address: str | None = Field(default=None, max_length=500)
     amount: Money | None
     subtotal: Money | None
     tax: Money | None
