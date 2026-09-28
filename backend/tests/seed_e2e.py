@@ -5,8 +5,9 @@ import os
 from sqlalchemy import select, text
 from sqlalchemy.engine import make_url
 
+from app.capture.charges import review
 from app.capture.currency import decide
-from app.capture.schemas import ParsedReceipt, Proposal
+from app.capture.schemas import ChargeEvidence, ParsedReceipt, Proposal
 from app.cli import initialize_user
 from app.core.db import engine, transaction
 from app.core.models import Base, CaptureDraft, Receipt, User
@@ -41,6 +42,19 @@ with transaction() as db:
             currency_text="$10.50",
             merchant_address=address,
         )
+        source = address + "\nTax 5% $0.50\nSuggested Tip 20% $2.00\nAmount Paid $10.50"
+        parsed.charge_evidence = ChargeEvidence.model_validate(
+            {
+                "tax_lines": [{"text": "Tax 5% $0.50", "amount": "0.50"}],
+                "tax_mode": "added",
+                "tip": {"text": "Suggested Tip 20% $2.00", "amount": "2.00"},
+                "tip_status": "suggested_only",
+                "service_charge": None,
+                "total": {"text": "Amount Paid $10.50", "amount": "10.50"},
+                "total_status": "final",
+            }
+        )
+        charges = review(parsed, source, has_image=False)
         decision = decide(parsed, address, has_image=False)
         receipt = Receipt(owner_id=owner, parse_status="parsed")
         db.add(receipt)
@@ -52,7 +66,7 @@ with transaction() as db:
                 source="web",
                 source_key=f"synthetic-currency-{viewport}",
                 request_hash="0" * 64,
-                source_text=address,
+                source_text=source,
                 proposal=Proposal(
                     merchant=merchant,
                     amount="10.50",
@@ -60,7 +74,7 @@ with transaction() as db:
                     occurred_on="2026-02-03",
                 ).model_dump(mode="json"),
                 parsed=parsed.model_dump(mode="json"),
-                warnings=[decision.warning],
+                warnings=[decision.warning, *charges.warnings],
             )
         )
 print("Synthetic browser fixture ready.")

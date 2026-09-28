@@ -27,9 +27,10 @@ from app.ledger.schemas import TransactionInput
 from app.ledger.service import book_lock, create_transaction, fail, owned
 from app.receipts import service as files
 
+from .charges import review as review_charges
 from .currency import decide
 from .prompts import PARSE_SCHEMA_VERSION, PROMPT_VERSION, explicit_currency
-from .schemas import DraftAction, DraftEdit, DraftOutput, ParsedReceipt, Proposal
+from .schemas import ChargeReview, DraftAction, DraftEdit, DraftOutput, ParsedReceipt, Proposal
 
 
 def draft_output(db: Session, row: CaptureDraft) -> DraftOutput:
@@ -37,6 +38,13 @@ def draft_output(db: Session, row: CaptureDraft) -> DraftOutput:
     status = row.status
     if status == "processing" and job and job.status in {"failed", "cancelled"}:
         status = "failed"
+    parsed = ParsedReceipt.model_validate(row.parsed) if row.parsed else None
+    attachment_id = db.scalar(
+        select(ReceiptAttachment.attachment_id)
+        .where(ReceiptAttachment.receipt_id == row.receipt_id)
+        .order_by(ReceiptAttachment.page_no)
+        .limit(1)
+    )
     return DraftOutput(
         id=row.id,
         revision=row.revision,
@@ -44,13 +52,11 @@ def draft_output(db: Session, row: CaptureDraft) -> DraftOutput:
         source=row.source,
         proposal=Proposal.model_validate(row.proposal),
         warnings=row.warnings,
-        parsed=ParsedReceipt.model_validate(row.parsed) if row.parsed else None,
-        attachment_id=db.scalar(
-            select(ReceiptAttachment.attachment_id)
-            .where(ReceiptAttachment.receipt_id == row.receipt_id)
-            .order_by(ReceiptAttachment.page_no)
-            .limit(1)
-        ),
+        parsed=parsed,
+        charge_review=review_charges(parsed, row.source_text, has_image=attachment_id is not None)
+        if parsed
+        else None,
+        attachment_id=attachment_id,
         confirmed_transaction_id=row.confirmed_transaction_id,
         created_at=row.created_at,
         job_status=job.status if job else None,
@@ -279,7 +285,9 @@ def retry_draft(
     return row
 
 
-def validate_parsed(result: ParsedReceipt, *, check_currency: bool = True) -> list[str]:
+def validate_parsed(
+    result: ParsedReceipt, *, check_currency: bool = True, charges: ChargeReview | None = None
+) -> list[str]:
     warnings = []
     for key, label in [
         ("merchant", "商家"),
@@ -295,7 +303,35 @@ def validate_parsed(result: ParsedReceipt, *, check_currency: bool = True) -> li
         warnings.append("收據幣別目前不支援，請確認實際帳戶扣款幣別與金額。")
     if result.subtotal is None:
         warnings.append("未取得小計，無法驗算品項與總額。")
-    if result.subtotal is not None and result.amount is not None:
+    if charges:
+        warnings.extend(charges.warnings)
+        if result.subtotal is not None and charges.amount is not None:
+            if (
+                charges.tax_mode == "unclear"
+                or charges.tax is None
+                or charges.tip is None
+                or result.discount is None
+                or (
+                    result.charge_evidence
+                    and result.charge_evidence.service_charge
+                    and charges.service_charge is None
+                )
+            ):
+                warnings.append("稅、小費、折扣或服務費資料不完整，無法完整驗算付款總額。")
+            else:
+                added_tax = Decimal(charges.tax) if charges.tax_mode == "added" else Decimal(0)
+                listed_total = (
+                    Decimal(result.subtotal)
+                    + added_tax
+                    + Decimal(charges.tip)
+                    + Decimal(charges.service_charge or "0")
+                    - Decimal(result.discount)
+                )
+                if listed_total != Decimal(charges.amount):
+                    warnings.append(
+                        "已辨識的小計、稅、小費、服務費及折扣與最終付款不符，請核對；不自動改算總額。"
+                    )
+    elif result.subtotal is not None and result.amount is not None:
         if result.tax is None or result.discount is None or result.tip is None:
             warnings.append("稅金、小費或折扣不明，無法驗算總額。")
         elif Decimal(result.subtotal) + Decimal(result.tax) + Decimal(result.tip) - Decimal(
@@ -370,6 +406,7 @@ def apply_parse(db: Session, job: Job, result: ParsedReceipt | None, error: str 
     assert result
     proposal = Proposal.model_validate(row.proposal)
     proposal.amount = result.amount
+    charges = None
     proposal.occurred_on = result.occurred_on
     proposal.merchant = result.merchant or ""
     currency = result.currency
@@ -386,12 +423,18 @@ def apply_parse(db: Session, job: Job, result: ParsedReceipt | None, error: str 
         )
         decision = decide(result, row.source_text, has_image=has_image)
         currency = decision.currency
+        if prompt_version >= 4:
+            charges = review_charges(result, row.source_text, has_image=has_image)
+            if charges:
+                proposal.amount = charges.amount
     elif prompt_version == 2:
         currency = currency if currency == explicit_currency(row.source_text) else None
     proposal.currency = currency if currency in {"USD", "TWD"} else None  # type: ignore[assignment]
     row.proposal = proposal.model_dump(mode="json")
     row.parsed = result.model_dump(mode="json", exclude_unset=True)
-    row.warnings = validate_parsed(result, check_currency=prompt_version < 3)
+    row.warnings = validate_parsed(result, check_currency=prompt_version < 3, charges=charges)
+    if prompt_version >= 4 and charges is None:
+        row.warnings.append("未取得稅與小費的逐列原文，顯示原始模型結果，請核對收據。")
     if decision:
         row.warnings = [decision.warning, *row.warnings]
     elif prompt_version == 2 and result.currency and proposal.currency is None:

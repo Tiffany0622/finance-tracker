@@ -118,7 +118,7 @@ def test_image_parse_applies_reviewable_default_without_posting(
     row = image(logged_in)
     job = next_job(logged_in, headers)
     source = {**PARSED, **details}
-    assert job["payload"]["prompt_version"] == 3 and job["payload"]["schema_version"] == 2
+    assert job["payload"]["prompt_version"] == 4 and job["payload"]["schema_version"] == 3
     assert complete(logged_in, headers, job, parsed=source).status_code == 200
     result = get_draft(logged_in, row)
     assert result["proposal"]["currency"] == expected
@@ -128,7 +128,7 @@ def test_image_parse_applies_reviewable_default_without_posting(
     with Session(engine()) as db:
         attempt = db.scalar(select(ReceiptParseAttempt))
         assert (
-            attempt.result == source and attempt.prompt_version == 3 and attempt.schema_version == 2
+            attempt.result == source and attempt.prompt_version == 4 and attempt.schema_version == 3
         )
         assert db.scalar(select(func.count()).select_from(Transaction)) == count_before
     # Manual currency changes retain amount and evidence. Acknowledgement remains required.

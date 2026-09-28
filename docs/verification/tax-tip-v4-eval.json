@@ -1,0 +1,420 @@
+{
+  "model": "qwen3-vl:8b-instruct",
+  "prompt_version": 4,
+  "at": "2026-09-28T06:43:17.465113+00:00",
+  "results": [
+    {
+      "case": "paid-tip",
+      "repeat": 1,
+      "mismatches": {},
+      "raw": {
+        "merchant": "Example Cafe",
+        "occurred_on": "2026-02-03",
+        "currency": "USD",
+        "currency_text": "Amount Paid USD 64.00",
+        "merchant_address": null,
+        "charge_evidence": {
+          "tax_lines": [
+            {
+              "text": "Tax 8% 4.00",
+              "amount": "4.00"
+            }
+          ],
+          "tax_mode": "added",
+          "tip": {
+            "text": "Tip 10.00",
+            "amount": "10.00"
+          },
+          "tip_status": "paid",
+          "service_charge": null,
+          "total": {
+            "text": "Amount Paid USD 64.00",
+            "amount": "64.00"
+          },
+          "total_status": "final"
+        },
+        "amount": "64.00",
+        "subtotal": "50.00",
+        "tax": "4.00",
+        "tip": "10.00",
+        "discount": "0.00",
+        "items": [],
+        "uncertainty": null
+      },
+      "charges": {
+        "tax": "4.00",
+        "tip": "10.00",
+        "service_charge": null,
+        "amount": "64.00",
+        "tax_mode": "added",
+        "tip_status": "paid",
+        "warnings": []
+      },
+      "seconds": 24.18,
+      "passed": true
+    },
+    {
+      "case": "suggested-only",
+      "repeat": 1,
+      "mismatches": {},
+      "raw": {
+        "merchant": "Example Cafe",
+        "occurred_on": "2026-02-03",
+        "currency": "USD",
+        "currency_text": "Amount Paid USD 54.00",
+        "merchant_address": null,
+        "charge_evidence": {
+          "tax_lines": [
+            {
+              "text": "Tax 8% 4.00",
+              "amount": "4.00"
+            }
+          ],
+          "tax_mode": "added",
+          "tip": null,
+          "tip_status": "suggested_only",
+          "service_charge": null,
+          "total": {
+            "text": "Amount Paid USD 54.00",
+            "amount": "54.00"
+          },
+          "total_status": "final"
+        },
+        "amount": "54.00",
+        "subtotal": "50.00",
+        "tax": "4.00",
+        "tip": null,
+        "discount": null,
+        "items": [],
+        "uncertainty": null
+      },
+      "charges": {
+        "tax": "4.00",
+        "tip": null,
+        "service_charge": null,
+        "amount": "54.00",
+        "tax_mode": "added",
+        "tip_status": "suggested_only",
+        "warnings": [
+          "只有建議小費選項，沒有當成已支付小費。"
+        ]
+      },
+      "seconds": 17.94,
+      "passed": true
+    },
+    {
+      "case": "blank-before-tip",
+      "repeat": 1,
+      "mismatches": {},
+      "raw": {
+        "merchant": "Example Cafe",
+        "occurred_on": "2026-02-03",
+        "currency": "USD",
+        "currency_text": "Total USD 54.00",
+        "merchant_address": null,
+        "charge_evidence": {
+          "tax_lines": [
+            {
+              "text": "Sales Tax 8% 4.00",
+              "amount": "4.00"
+            }
+          ],
+          "tax_mode": "added",
+          "tip": {
+            "text": "Tip _________",
+            "amount": null
+          },
+          "tip_status": "blank",
+          "service_charge": null,
+          "total": {
+            "text": "Total USD 54.00",
+            "amount": "54.00"
+          },
+          "total_status": "before_tip"
+        },
+        "amount": null,
+        "subtotal": "50.00",
+        "tax": "4.00",
+        "tip": null,
+        "discount": null,
+        "items": [],
+        "uncertainty": "Tip line is blank, Final Total is blank, so amount is null. Tax is added, not included. No items listed."
+      },
+      "charges": {
+        "tax": "4.00",
+        "tip": null,
+        "service_charge": null,
+        "amount": null,
+        "tax_mode": "added",
+        "tip_status": "blank",
+        "warnings": [
+          "小費欄空白或手寫不清楚，實付小費仍不明。",
+          "最終付款金額尚未確認；未採用小費前總額、建議金額、付款現金或找零，請手動核對。"
+        ]
+      },
+      "seconds": 42.24,
+      "passed": true
+    },
+    {
+      "case": "included-vat",
+      "repeat": 1,
+      "mismatches": {},
+      "raw": {
+        "merchant": "Example Cafe",
+        "occurred_on": "2026-02-03",
+        "currency": "NT$",
+        "currency_text": "實付 NT$ 120.00",
+        "merchant_address": null,
+        "charge_evidence": {
+          "tax_lines": [
+            {
+              "text": "內含營業稅 5% 5.71",
+              "amount": "5.71"
+            }
+          ],
+          "tax_mode": "included",
+          "tip": {
+            "text": "小費 0.00",
+            "amount": "0.00"
+          },
+          "tip_status": "paid",
+          "service_charge": null,
+          "total": {
+            "text": "實付 NT$ 120.00",
+            "amount": "120.00"
+          },
+          "total_status": "final"
+        },
+        "amount": "120.00",
+        "subtotal": "120.00",
+        "tax": "5.71",
+        "tip": "0.00",
+        "discount": "0.00",
+        "items": [],
+        "uncertainty": null
+      },
+      "charges": {
+        "tax": "5.71",
+        "tip": "0.00",
+        "service_charge": null,
+        "amount": "120.00",
+        "tax_mode": "included",
+        "tip_status": "paid",
+        "warnings": [
+          "收據標示含稅，稅額已包含於小計／價格，不會再加一次。"
+        ]
+      },
+      "seconds": 70.76,
+      "passed": true
+    },
+    {
+      "case": "multiple-taxes",
+      "repeat": 1,
+      "mismatches": {},
+      "raw": {
+        "merchant": "Example Cafe",
+        "occurred_on": "2026-02-03",
+        "currency": "CAD",
+        "currency_text": "Amount Paid CAD 56.00",
+        "merchant_address": null,
+        "charge_evidence": {
+          "tax_lines": [
+            {
+              "text": "GST 5% 2.50",
+              "amount": "2.50"
+            },
+            {
+              "text": "PST 7% 3.50",
+              "amount": "3.50"
+            },
+            {
+              "text": "Total Tax 6.00",
+              "amount": "6.00"
+            }
+          ],
+          "tax_mode": "added",
+          "tip": {
+            "text": "Tip 0.00",
+            "amount": "0.00"
+          },
+          "tip_status": "paid",
+          "service_charge": null,
+          "total": {
+            "text": "Amount Paid CAD 56.00",
+            "amount": "56.00"
+          },
+          "total_status": "final"
+        },
+        "amount": "56.00",
+        "subtotal": "50.00",
+        "tax": "6.00",
+        "tip": "0.00",
+        "discount": null,
+        "items": [],
+        "uncertainty": null
+      },
+      "charges": {
+        "tax": "6.00",
+        "tip": "0.00",
+        "service_charge": null,
+        "amount": "56.00",
+        "tax_mode": "added",
+        "tip_status": "paid",
+        "warnings": []
+      },
+      "seconds": 28.62,
+      "passed": true
+    },
+    {
+      "case": "service-and-tip",
+      "repeat": 1,
+      "mismatches": {},
+      "raw": {
+        "merchant": "Example Cafe",
+        "occurred_on": "2026-02-03",
+        "currency": "USD",
+        "currency_text": "Amount Paid USD 62.00",
+        "merchant_address": null,
+        "charge_evidence": {
+          "tax_lines": [
+            {
+              "text": "Tax 8% 4.00",
+              "amount": "4.00"
+            }
+          ],
+          "tax_mode": "added",
+          "tip": {
+            "text": "Tip 3.00",
+            "amount": "3.00"
+          },
+          "tip_status": "paid",
+          "service_charge": {
+            "text": "Service Charge 10% 5.00",
+            "amount": "5.00"
+          },
+          "total": {
+            "text": "Amount Paid USD 62.00",
+            "amount": "62.00"
+          },
+          "total_status": "final"
+        },
+        "amount": "62.00",
+        "subtotal": "50.00",
+        "tax": "4.00",
+        "tip": "3.00",
+        "discount": "0.00",
+        "items": [],
+        "uncertainty": null
+      },
+      "charges": {
+        "tax": "4.00",
+        "tip": "3.00",
+        "service_charge": "5.00",
+        "amount": "62.00",
+        "tax_mode": "added",
+        "tip_status": "paid",
+        "warnings": []
+      },
+      "seconds": 27.45,
+      "passed": true
+    },
+    {
+      "case": "rate-only",
+      "repeat": 1,
+      "mismatches": {},
+      "raw": {
+        "merchant": "Example Cafe",
+        "occurred_on": "2026-02-03",
+        "currency": "USD",
+        "currency_text": "Amount Paid USD 54.13",
+        "merchant_address": null,
+        "charge_evidence": {
+          "tax_lines": [],
+          "tax_mode": "unclear",
+          "tip": {
+            "text": "Tip 0.00",
+            "amount": "0.00"
+          },
+          "tip_status": "paid",
+          "service_charge": null,
+          "total": {
+            "text": "Amount Paid USD 54.13",
+            "amount": "54.13"
+          },
+          "total_status": "final"
+        },
+        "amount": "54.13",
+        "subtotal": "50.00",
+        "tax": null,
+        "tip": "0.00",
+        "discount": null,
+        "items": [],
+        "uncertainty": "Tax rate 8.25% is a rate, not a tax amount. No tax line printed, so tax is null. No items listed."
+      },
+      "charges": {
+        "tax": null,
+        "tip": "0.00",
+        "service_charge": null,
+        "amount": "54.13",
+        "tax_mode": "unclear",
+        "tip_status": "paid",
+        "warnings": [
+          "稅額缺少清楚的金額原文或各列不一致；稅率不當成稅額，也不自行反推。",
+          "含稅方式不明，請核對小計與最終付款金額。"
+        ]
+      },
+      "seconds": 40.45,
+      "passed": true
+    },
+    {
+      "case": "cash-change-zero",
+      "repeat": 1,
+      "mismatches": {},
+      "raw": {
+        "merchant": "Example Cafe",
+        "occurred_on": "2026-02-03",
+        "currency": "USD",
+        "currency_text": "Amount Paid USD 20.00",
+        "merchant_address": null,
+        "charge_evidence": {
+          "tax_lines": [
+            {
+              "text": "Tax 0.00",
+              "amount": "0.00"
+            }
+          ],
+          "tax_mode": "added",
+          "tip": {
+            "text": "Tip 0.00",
+            "amount": "0.00"
+          },
+          "tip_status": "paid",
+          "service_charge": null,
+          "total": {
+            "text": "Amount Paid USD 20.00",
+            "amount": "20.00"
+          },
+          "total_status": "final"
+        },
+        "amount": "20.00",
+        "subtotal": "20.00",
+        "tax": "0.00",
+        "tip": "0.00",
+        "discount": null,
+        "items": [],
+        "uncertainty": null
+      },
+      "charges": {
+        "tax": "0.00",
+        "tip": "0.00",
+        "service_charge": null,
+        "amount": "20.00",
+        "tax_mode": "added",
+        "tip_status": "paid",
+        "warnings": []
+      },
+      "seconds": 18.17,
+      "passed": true
+    }
+  ]
+}

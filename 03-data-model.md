@@ -364,3 +364,16 @@ ReportSnapshot 以不可變 JSON document 保存完整 metadata／指標／明�
 DB schema 仍為 `0006_products`，沒有 migration。ParsedReceipt 新增可空 currency_text（最多 300 字）與 merchant_address（最多 500 字），保存在既有 result／parsed JSONB；舊 JSON 缺欄位視為 null，不回填既有資料。寫入採 exclude_unset，避免因讀取舊模型而補寫空欄位。原始模型 currency 保留，即使最終預填不同也不改成規則判斷值。
 
 新解析工作保存 prompt_version=3、schema_version=2，parse attempt 依工作版本保存；舊工作缺值維持 1，版本 2 工作保持舊幣別策略。最後判斷只寫草稿 proposal.currency 與初次辨識 warnings，由既有 revision／lease 防護控制；人工選幣別、金額、帳戶及確認仍使用原欄位與交易邊界。不批次更新既有草稿、品項核對或正式帳務。
+
+
+### 稅與小費解析 JSON 擴充（schema_version=3）
+
+沿用既有 JSON 欄與 DB head `0006_products`，無 migration。`ReceiptParseAttempt.result` 與 `CaptureDraft.parsed` 保留模型回覆，新增 nullable `charge_evidence`：
+
+- `tax_lines[]`：最多 10 列 `{text, amount?}`，原文最多 300 字。
+- `tax_mode`：added／included／unclear。
+- `tip`、`service_charge`、`total`：各為 nullable `{text, amount?}`。
+- `tip_status`：paid／blank／suggested_only／not_printed／unclear。
+- `total_status`：final／before_tip／unclear。
+
+所有金額使用既有 Money decimal string／null，不用浮點數。原本的 tax／tip／amount 繼續保存，不能被核對候選覆寫。API `DraftOutput.charge_review` 提供 tax、tip、service_charge、amount、含稅／小費狀態與提醒，是唯讀衍生資料，沒有新增正式分錄或可變原始稅費欄。人工修改只更新 proposal；確認交易仍用既有 ledger service。舊 JSON 沒有新欄位時回傳 null，原始 snapshot 不回填新欄。

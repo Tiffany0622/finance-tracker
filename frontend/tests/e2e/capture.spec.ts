@@ -40,6 +40,15 @@ test('receipt items survive review, confirm once, search history and correct pos
   await expect(currencyDialog.getByRole('combobox',{name:'收據幣別',exact:true})).toHaveValue('USD');
   await expect(currencyDialog.getByRole('note')).toContainText('地區推測');
   await expect(currencyDialog.getByRole('note')).toContainText('Palo Alto CA 94301');
+  const charges=currencyDialog.getByRole('region',{name:'稅與小費核對'});
+  await expect(charges).toContainText('稅額 0.50（另加稅）');
+  await expect(charges).toContainText('實付小費 不明（僅建議小費）');
+  await expect(charges).toContainText('服務費 不明');
+  await charges.getByText('查看模型讀到的金額原文',{exact:true}).click();
+  await expect(charges).toContainText('Suggested Tip 20% $2.00');
+  await charges.scrollIntoViewIfNeeded();
+  expect(await currencyDialog.evaluate(n=>n.scrollWidth>n.clientWidth)).toBe(false);
+  await page.screenshot({path:info.outputPath('tax-tip-review.png')});
   await currencyDialog.getByRole('combobox',{name:'收據幣別',exact:true}).selectOption('TWD');
   await expect(currencyDialog.getByLabel('金額',{exact:true})).toHaveValue('10.50');
   await currencyDialog.getByRole('button',{name:'儲存草稿修改'}).click();

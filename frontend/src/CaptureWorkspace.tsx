@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Camera, FileText, RefreshCw, Plus, X, Check, Send } from 'lucide-react';
 import { api } from './api/client';
 import type { components } from './api/schema';
+import { ReceiptCharges } from './components/ReceiptCharges';
 import { ReceiptItemEditor } from './components/ReceiptItemEditor';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { CategoryForm } from './components/CategoryForm';
@@ -111,6 +112,7 @@ export function DraftEditor({initial,accounts,categories,currency,onClose,onSave
     <div className="capture-editor-grid"><div className="capture-evidence">{preview?<img className="capture-preview" src={preview} alt="收據預覽"/>:<p className="form-hint">{draft.attachment_id?'圖片載入中':'這份草稿沒有照片'}</p>}
     {draft.parsed&&<details><summary>原始辨識品項（{draft.parsed.items.length}）</summary><p className="footnote">保留辨識原文供核對，不會自動建立商品或分攤。</p>{draft.parsed.items.map((item,i)=><div className="capture-item" key={i}><span>{item.raw_name}<small>{item.quantity??'數量不明'} × {item.unit_price??'單價不明'}</small></span><strong>{item.line_total??'金額不明'}</strong></div>)}<p>小計 {draft.parsed.subtotal??'不明'} · 稅 {draft.parsed.tax??'不明'} · 小費 {draft.parsed.tip??'不明'} · 折扣 {draft.parsed.discount??'不明'}</p></details>}</div>
     <div><form onSubmit={save}><fieldset disabled={busy||closed||itemBusy||itemDirty}><div className="form-grid"><label>收支類型<select value={proposal.kind} onChange={e=>{change('kind',e.target.value as Proposal['kind']);change('category_id',null);change('splits',[]);}}><option value="expense">支出</option><option value="income">收入</option></select></label><label>收據幣別<select value={proposal.currency??''} onChange={e=>change('currency',(e.target.value||null) as Proposal['currency'])}><option value="">請核對幣別</option><option>USD</option><option>TWD</option></select></label></div>
+    <ReceiptCharges draft={draft} />
     {draft.warnings.find(w=>w.startsWith('幣別判斷：'))?<p className="form-hint" role="note">{draft.warnings.find(w=>w.startsWith('幣別判斷：'))}</p>:!proposal.currency&&draft.parsed?.currency&&<p className="form-hint">AI 建議幣別：{draft.parsed.currency}，請核對原圖後選擇。</p>}
     <div className="form-grid"><label>金額<input inputMode="decimal" value={proposal.amount??''} onChange={e=>change('amount',e.target.value||null)} pattern="[0-9]+(\.[0-9]{1,2})?" placeholder="尚未辨識"/></label><label>帳務日期<input type="date" value={proposal.occurred_on??''} onChange={e=>change('occurred_on',e.target.value||null)}/></label></div>
     <label>記帳帳戶<select value={proposal.account_id??''} onChange={e=>change('account_id',e.target.value||null)}><option value="">請選擇帳戶</option>{accounts.filter(a=>!a.archived).map(a=><option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select></label>

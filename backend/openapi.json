@@ -6936,6 +6936,212 @@
         ],
         "title": "CategorySuggestions"
       },
+      "ChargeEvidence": {
+        "properties": {
+          "tax_lines": {
+            "items": {
+              "$ref": "#/components/schemas/ChargeLine"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Tax Lines"
+          },
+          "tax_mode": {
+            "type": "string",
+            "enum": [
+              "added",
+              "included",
+              "unclear"
+            ],
+            "title": "Tax Mode"
+          },
+          "tip": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChargeLine"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tip_status": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "blank",
+              "suggested_only",
+              "not_printed",
+              "unclear"
+            ],
+            "title": "Tip Status"
+          },
+          "service_charge": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChargeLine"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChargeLine"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total_status": {
+            "type": "string",
+            "enum": [
+              "final",
+              "before_tip",
+              "unclear"
+            ],
+            "title": "Total Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tax_lines",
+          "tax_mode",
+          "tip",
+          "tip_status",
+          "service_charge",
+          "total",
+          "total_status"
+        ],
+        "title": "ChargeEvidence"
+      },
+      "ChargeLine": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Text"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 34,
+                "pattern": "^-?\\d{1,14}(\\.\\d{1,18})?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text",
+          "amount"
+        ],
+        "title": "ChargeLine"
+      },
+      "ChargeReview": {
+        "properties": {
+          "tax": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 34,
+                "pattern": "^-?\\d{1,14}(\\.\\d{1,18})?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax"
+          },
+          "tip": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 34,
+                "pattern": "^-?\\d{1,14}(\\.\\d{1,18})?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tip"
+          },
+          "service_charge": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 34,
+                "pattern": "^-?\\d{1,14}(\\.\\d{1,18})?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Charge"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 34,
+                "pattern": "^-?\\d{1,14}(\\.\\d{1,18})?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "tax_mode": {
+            "type": "string",
+            "enum": [
+              "added",
+              "included",
+              "unclear"
+            ],
+            "title": "Tax Mode"
+          },
+          "tip_status": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "blank",
+              "suggested_only",
+              "not_printed",
+              "unclear"
+            ],
+            "title": "Tip Status"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tax",
+          "tip",
+          "service_charge",
+          "amount",
+          "tax_mode",
+          "tip_status",
+          "warnings"
+        ],
+        "title": "ChargeReview"
+      },
       "CsrfOutput": {
         "properties": {
           "token": {
@@ -7021,6 +7227,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ParsedReceipt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "charge_review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChargeReview"
               },
               {
                 "type": "null"
@@ -7534,6 +7750,16 @@
               }
             ],
             "title": "Merchant Address"
+          },
+          "charge_evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChargeEvidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "amount": {
             "anyOf": [

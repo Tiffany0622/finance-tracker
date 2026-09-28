@@ -15,12 +15,38 @@ class ParsedItem(StrictModel):
     line_total: Money | None
 
 
+class ChargeLine(StrictModel):
+    text: str = Field(max_length=300)
+    amount: Money | None
+
+
+class ChargeEvidence(StrictModel):
+    tax_lines: list[ChargeLine] = Field(max_length=10)
+    tax_mode: Literal["added", "included", "unclear"]
+    tip: ChargeLine | None
+    tip_status: Literal["paid", "blank", "suggested_only", "not_printed", "unclear"]
+    service_charge: ChargeLine | None
+    total: ChargeLine | None
+    total_status: Literal["final", "before_tip", "unclear"]
+
+
+class ChargeReview(BaseModel):
+    tax: Money | None
+    tip: Money | None
+    service_charge: Money | None
+    amount: Money | None
+    tax_mode: Literal["added", "included", "unclear"]
+    tip_status: Literal["paid", "blank", "suggested_only", "not_printed", "unclear"]
+    warnings: list[str]
+
+
 class ParsedReceipt(StrictModel):
     merchant: str | None = Field(max_length=200)
     occurred_on: date | None
     currency: str | None = Field(max_length=12)
     currency_text: str | None = Field(default=None, max_length=300)
     merchant_address: str | None = Field(default=None, max_length=500)
+    charge_evidence: ChargeEvidence | None = None
     amount: Money | None
     subtotal: Money | None
     tax: Money | None
@@ -66,6 +92,7 @@ class DraftOutput(BaseModel):
     proposal: Proposal
     warnings: list[str]
     parsed: ParsedReceipt | None
+    charge_review: ChargeReview | None = None
     attachment_id: UUID | None
     confirmed_transaction_id: UUID | None
     created_at: datetime

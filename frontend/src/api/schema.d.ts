@@ -1027,6 +1027,59 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** ChargeEvidence */
+        ChargeEvidence: {
+            /** Tax Lines */
+            tax_lines: components["schemas"]["ChargeLine"][];
+            /**
+             * Tax Mode
+             * @enum {string}
+             */
+            tax_mode: "added" | "included" | "unclear";
+            tip: components["schemas"]["ChargeLine"] | null;
+            /**
+             * Tip Status
+             * @enum {string}
+             */
+            tip_status: "paid" | "blank" | "suggested_only" | "not_printed" | "unclear";
+            service_charge: components["schemas"]["ChargeLine"] | null;
+            total: components["schemas"]["ChargeLine"] | null;
+            /**
+             * Total Status
+             * @enum {string}
+             */
+            total_status: "final" | "before_tip" | "unclear";
+        };
+        /** ChargeLine */
+        ChargeLine: {
+            /** Text */
+            text: string;
+            /** Amount */
+            amount: string | null;
+        };
+        /** ChargeReview */
+        ChargeReview: {
+            /** Tax */
+            tax: string | null;
+            /** Tip */
+            tip: string | null;
+            /** Service Charge */
+            service_charge: string | null;
+            /** Amount */
+            amount: string | null;
+            /**
+             * Tax Mode
+             * @enum {string}
+             */
+            tax_mode: "added" | "included" | "unclear";
+            /**
+             * Tip Status
+             * @enum {string}
+             */
+            tip_status: "paid" | "blank" | "suggested_only" | "not_printed" | "unclear";
+            /** Warnings */
+            warnings: string[];
+        };
         /** CsrfOutput */
         CsrfOutput: {
             /** Token */
@@ -1065,6 +1118,7 @@ export interface components {
             /** Warnings */
             warnings: string[];
             parsed: components["schemas"]["ParsedReceipt"] | null;
+            charge_review?: components["schemas"]["ChargeReview"] | null;
             /** Attachment Id */
             attachment_id: string | null;
             /** Confirmed Transaction Id */
@@ -1207,6 +1261,7 @@ export interface components {
             currency_text?: string | null;
             /** Merchant Address */
             merchant_address?: string | null;
+            charge_evidence?: components["schemas"]["ChargeEvidence"] | null;
             /** Amount */
             amount: string | null;
             /** Subtotal */

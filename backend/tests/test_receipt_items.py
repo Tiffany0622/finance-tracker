@@ -110,6 +110,7 @@ def test_review_confirm_search_correct_and_remove_preserve_raw_and_ledger(logged
         **PARSED,
         "currency_text": None,
         "merchant_address": None,
+        "charge_evidence": None,
     }
     after = balances(logged_in)
     state = item_state(logged_in, posted)

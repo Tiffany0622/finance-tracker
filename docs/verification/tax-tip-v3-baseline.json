@@ -1,0 +1,68 @@
+{
+  "model": "qwen3-vl:8b-instruct",
+  "prompt_version": 3,
+  "at": "2026-09-28T06:39:32.765092+00:00",
+  "results": [
+    {
+      "case": "paid-tip",
+      "repeat": 1,
+      "mismatches": {},
+      "seconds": 30.88,
+      "passed": true
+    },
+    {
+      "case": "suggested-only",
+      "repeat": 1,
+      "mismatches": {},
+      "seconds": 12.42,
+      "passed": true
+    },
+    {
+      "case": "blank-before-tip",
+      "repeat": 1,
+      "mismatches": {
+        "amount": {
+          "expected": null,
+          "actual": "54.00"
+        }
+      },
+      "seconds": 10.45,
+      "passed": false
+    },
+    {
+      "case": "included-vat",
+      "repeat": 1,
+      "mismatches": {},
+      "seconds": 14.68,
+      "passed": true
+    },
+    {
+      "case": "multiple-taxes",
+      "repeat": 1,
+      "mismatches": {},
+      "seconds": 10.0,
+      "passed": true
+    },
+    {
+      "case": "service-and-tip",
+      "repeat": 1,
+      "mismatches": {},
+      "seconds": 10.0,
+      "passed": true
+    },
+    {
+      "case": "rate-only",
+      "repeat": 1,
+      "mismatches": {},
+      "seconds": 10.44,
+      "passed": true
+    },
+    {
+      "case": "cash-change-zero",
+      "repeat": 1,
+      "mismatches": {},
+      "seconds": 10.37,
+      "passed": true
+    }
+  ]
+}

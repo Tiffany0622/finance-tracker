@@ -134,3 +134,26 @@ backend/.venv/bin/python scripts/evaluate-local-ai.py --output .tools/receipt-ev
 ```
 
 腳本將 `backend/tests/fixtures/receipt-eval.json` 的合成收據渲染成圖片，逐欄比較金額、日期及幣別；不讀真實收據、不寫帳本、不連 Telegram／雲端。任一欄位不符以非零狀態結束，完整保留錯誤。`--prompt-version 1` 可比對舊提示，`--repeat 3` 可重複量測；其他系統須用 `--font` 指定可顯示繁體中文的 TTF / TTC 字型。這是選擇性模型實測，不是 CI mock 測試，三份乾淨合成圖也不代表真實收據全面驗收。
+
+
+## 稅與小費核對
+
+新版 Web／Telegram 草稿會分開顯示稅額、實付小費、服務費及最終付款候選：
+
+- `Tax 8% 4.00` 的稅額是 4.00；只有稅率時保留不明，不反推。
+- 含稅小計不再加一次稅；多筆稅額不和稅合計重複計入。
+- 建議 15%／18%／20% 小費不當成已付。空白、手寫不清楚、未列出保持不明；明寫 0 才顯示 0。
+- 服務費獨立列出。請確認「金額」填的是最終付款，包含已支付的稅及小費，不需再相加。
+- 小費空白且只有小費前 Total 時，最終付款留待填寫；現金付款金額與找零不當成消費總額。
+
+網頁「稅與小費核對」可展開模型讀到的原文。這是初次辨識候選，人工改金額後不會跟著變；請以原圖核對。照片引文仍可能被模型看錯，並非第二套 OCR 證明。
+
+新收據會採新版。既有未入帳草稿可按「重新辨識」並確認重試；這會重新預填金額／日期／商家等欄，請先確認是否需要覆蓋人工修改。已入帳交易不會變更。實測限制與測試證據見 [稅與小費驗證](verification/tax-tip-recognition.md)。
+
+重跑合成圖片評估：
+
+```sh
+backend/.venv/bin/python scripts/evaluate-local-ai.py --prompt-version 4 --fixtures backend/tests/fixtures/receipt-tax-tip-eval.json --output .tools/tax-tip-eval.json
+```
+
+比較舊版可用 `--prompt-version 3`；八張合成圖不是實拍、模糊或手寫驗收。腳本包含稅率、建議／空白小費、含稅、多稅列、服務費、明確零與找零，任一預期不符仍以 exit 1 留存。

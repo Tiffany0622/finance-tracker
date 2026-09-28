@@ -31,6 +31,24 @@ def parse(
         else:
             schema["properties"][field].pop("default", None)
             schema["required"].append(field)
+    if prompt_version < 4:
+        schema["properties"].pop("charge_evidence")
+        for definition in ("ChargeEvidence", "ChargeLine"):
+            schema.get("$defs", {}).pop(definition, None)
+    else:
+        schema["properties"]["charge_evidence"].pop("default", None)
+        schema["required"].append("charge_evidence")
+        charges = schema["$defs"]["ChargeEvidence"]["properties"]
+        charges["tax_lines"]["description"] = (
+            "Copy ALL printed tax money lines, including Tax 0.00. Empty only when no tax line is printed."
+        )
+        charges["tip_status"]["description"] = (
+            "Tip ____ or unreadable handwriting means blank, not not_printed. Suggested percentages are not paid."
+        )
+        charges["tip"]["description"] = (
+            "Copy the actual tip label even if its entry is blank; blank amount is null."
+        )
+
     try:
         prompt = receipt_prompt(prompt_version)
     except ValueError:

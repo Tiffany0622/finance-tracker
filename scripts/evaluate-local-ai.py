@@ -16,6 +16,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
+from app.capture.charges import review  # noqa: E402
 from app.capture.currency import decide  # noqa: E402
 from app.capture.prompts import PROMPT_VERSION  # noqa: E402
 from app.capture.providers import parse  # noqa: E402
@@ -28,7 +29,9 @@ MONEY_FIELDS = {"amount", "subtotal", "tax", "tip", "discount"}
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", default="qwen3-vl:8b-instruct")
-    parser.add_argument("--prompt-version", type=int, choices=[1, 2, 3], default=PROMPT_VERSION)
+    parser.add_argument(
+        "--prompt-version", type=int, choices=[1, 2, 3, 4], default=PROMPT_VERSION
+    )
     parser.add_argument(
         "--fixtures",
         type=Path,
@@ -75,24 +78,55 @@ def main():
                 for key, expected in case["expected"].items():
                     actual = parsed[key]
                     equal = actual == expected
-                    if key in MONEY_FIELDS and actual is not None and expected is not None:
+                    if (
+                        key in MONEY_FIELDS
+                        and actual is not None
+                        and expected is not None
+                    ):
                         equal = Decimal(actual) == Decimal(expected)
                     if not equal:
                         result["mismatches"][key] = {
                             "expected": expected,
                             "actual": actual,
                         }
+                if "expected_charges" in case and args.prompt_version >= 4:
+                    charges = review(
+                        ParsedReceipt.model_validate(parsed), "", has_image=True
+                    )
+                    result["raw"] = parsed
+                    result["charges"] = (
+                        charges.model_dump(mode="json") if charges else None
+                    )
+                    for key, expected in case["expected_charges"].items():
+                        actual = getattr(charges, key) if charges else None
+                        equal = actual == expected
+                        if (
+                            key in MONEY_FIELDS | {"service_charge"}
+                            and actual is not None
+                            and expected is not None
+                        ):
+                            equal = Decimal(actual) == Decimal(expected)
+                        if not equal:
+                            result["mismatches"]["charges." + key] = {
+                                "expected": expected,
+                                "actual": actual,
+                            }
                 if "expected_currency" in case:
-                    decision = decide(ParsedReceipt.model_validate(parsed), "", has_image=True)
+                    decision = decide(
+                        ParsedReceipt.model_validate(parsed), "", has_image=True
+                    )
                     result["evidence"] = {
-                        k: parsed[k] for k in ("currency", "currency_text", "merchant_address")
+                        k: parsed[k]
+                        for k in ("currency", "currency_text", "merchant_address")
                     }
                     result["decision"] = {
                         "currency": decision.currency,
                         "basis": decision.basis,
                     }
                     expected = case["expected_currency"]
-                    result["currency_prefill_matches"] = decision.currency == expected["currency"]
+                    result["currency_prefill_matches"] = (
+                        decision.currency == expected["currency"]
+                    )
                     if result["decision"] != expected:
                         result["mismatches"]["currency_decision"] = {
                             "expected": expected,

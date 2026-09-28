@@ -127,6 +127,8 @@ D1-03 已交付的交易主檔、修訂、owner 權限及正式記帳服務足�
 - D2-04：三個查詢共用既有報表，`/budget` 明示未實作。2026-09-27 已交付 Web 草稿的本機分類候選：同商家近期已入帳分類、商家／備註／品項關鍵字、理由與明確選用、缺少分類時建立後選用；分攤先指定目標列。商家／標籤自動預設、自訂規則與 Bot 建議仍未交付，維持 DOING。驗證見 [category-suggestions.md](docs/verification/category-suggestions.md)。
 - 2026-09-27 收據分類修正：草稿內可直接新增主／子分類並選用，分攤列可各自建立分類，取消返回保留草稿。與記帳共用分類表單、既有授權／冪等 API；不變更階段狀態。驗證見 [receipt-categories.md](docs/verification/receipt-categories.md)。
 - 2026-09-27 D2-02／D2-03 幣別擴充：提示版本 3 保存貨幣原文與商家地址，Web／Telegram 以明確文字優先、足夠美國／台灣地址次之預填；顯示依據，保留人工核對／更改，單一語言或 `$` 不預設幣別。仍有模型誤讀與非支援地區限制，完整品質、喚醒與實機驗收不因此完成。驗證見 [currency-inference.md](docs/verification/currency-inference.md)。
+- 2026-09-27 D2-02／D2-03 稅與小費擴充：提示版本 4／JSON 版本 3，逐列稅額、含稅方式、實付／建議／空白小費、獨立服務費與最終付款核對；Web／Telegram 顯示候選，不重複加稅費、不自動過帳。實際測試與已知限制見 [tax-tip-recognition.md](docs/verification/tax-tip-recognition.md)，不因此完成真實拍攝品質、速度或 iPhone 驗收。
+
 - D2-05 每日摘要與主動通知仍 TODO；未設定時不發送，也未自行決定通知時間。
 - D2-06 真實 Telegram 收件及單張本機 OCR → 草稿 → Bot 回覆已驗收；最初小計誤讀已由提示版本 2 的原圖唯讀比對改善，幣別推測仍由人工核對。使用者已自行將該草稿入帳；本次不重跑或修改已入帳草稿。完整 iPhone 操作驗收、喚醒、多樣本品質與效能仍待驗。驗證紀錄：[capture-telegram.md](docs/verification/capture-telegram.md)、[local-ai.md](docs/verification/local-ai.md)；本機啟用：[capture-setup.md](docs/capture-setup.md)。
 

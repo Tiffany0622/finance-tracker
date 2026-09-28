@@ -48,7 +48,8 @@ def show_draft(db: Session, row: CaptureDraft, key: str) -> None:
     if not row.chat_id:
         return
     p = Proposal.model_validate(row.proposal)
-    status = service.draft_output(db, row).status
+    view = service.draft_output(db, row)
+    status = view.status
     account = db.get(Account, p.account_id) if p.account_id else None
     category = db.get(Category, p.category_id) if p.category_id else None
     labels = {
@@ -61,18 +62,18 @@ def show_draft(db: Session, row: CaptureDraft, key: str) -> None:
     text = f"草稿 {row.id.hex[:8]} · {labels[status]}\n{p.merchant or '商家待補'}\n日期：{p.occurred_on or '待補'}\n金額：{p.currency or '幣別待補'} {p.amount or '待補'}\n帳戶：{account.name if account else '待選'}\n分類：{category.name if category else '已分攤' if p.splits else '待選'}"
     if row.parsed:
         title = "前次辨識明細" if status == "processing" else "原始辨識明細（供核對）"
+        fields = (
+            [("小計", "subtotal"), ("折扣", "discount")]
+            if view.charge_review
+            else [("小計", "subtotal"), ("稅", "tax"), ("小費", "tip"), ("折扣", "discount")]
+        )
         text += (
             "\n"
             + title
             + "："
             + " · ".join(
                 f"{label} {row.parsed.get(field) if row.parsed.get(field) is not None else '不明'}"
-                for label, field in [
-                    ("小計", "subtotal"),
-                    ("稅", "tax"),
-                    ("小費", "tip"),
-                    ("折扣", "discount"),
-                ]
+                for label, field in fields
             )
         )
         if (
@@ -81,6 +82,24 @@ def show_draft(db: Session, row: CaptureDraft, key: str) -> None:
             and not any(w.startswith("幣別判斷：") for w in row.warnings)
         ):
             text += f"\nAI 建議幣別：{row.parsed['currency']}，請核對後選擇。"
+    if view.charge_review:
+        charges = view.charge_review
+        tax_mode = {"added": "另加稅", "included": "含稅、不重複加", "unclear": "含稅方式不明"}[
+            charges.tax_mode
+        ]
+        tip_status = {
+            "paid": "實付欄",
+            "blank": "空白／不清楚",
+            "suggested_only": "僅建議小費",
+            "not_printed": "未列出",
+            "unclear": "不明",
+        }[charges.tip_status]
+        text += (
+            f"\n稅與小費核對候選：稅 {charges.tax or '不明'}（{tax_mode}）"
+            f" · 小費 {charges.tip or '不明'}（{tip_status}）"
+            f" · 服務費 {charges.service_charge or '不明'}"
+            f"\n辨識的最終付款：{charges.amount or '待補'}；不另外加稅或小費。"
+        )
     if row.warnings:
         text += "\n提醒：" + "；".join(row.warnings)
     buttons = None
