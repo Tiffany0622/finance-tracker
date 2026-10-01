@@ -40,6 +40,7 @@ BACKUP_TABLES = (
     + ("capture_drafts", "receipt_parse_attempts", "telegram_events", "telegram_cursors")
     + ("receipt_item_reviews", "receipt_items")
     + ("products", "product_aliases")
+    + ("recurring_rules", "recurring_occurrences")
 )
 
 
@@ -169,6 +170,7 @@ def verify_backup(path: Path) -> dict[str, Any]:
         "0003_receipts",
         "0004_capture",
         "0005_items",
+        "0006_products",
         SCHEMA_VERSION,
     ):
         raise ValueError("backup_version_unsupported")
@@ -288,6 +290,11 @@ def _create_backup(backup_id: uuid.UUID) -> Path:
                             for name in BACKUP_TABLES
                         }
                         financial_hash = financial_fingerprint(db)
+                        recurring_hash = (
+                            recurring_fingerprint(db)
+                            if SCHEMA_VERSION == "0007_recurring"
+                            else None
+                        )
                         db_version = db.scalar(text("SHOW server_version"))
                     files = {
                         str(p.relative_to(staging)): sha256(p)
@@ -297,6 +304,7 @@ def _create_backup(backup_id: uuid.UUID) -> Path:
                     manifest = {
                         "format_version": 1,
                         "schema_version": SCHEMA_VERSION,
+                        "recurring_hash": recurring_hash,
                         "app_commit": cfg.app_commit,
                         "postgres_version": db_version,
                         "backup_id": str(backup_id),
@@ -410,6 +418,7 @@ def restore_backup(source: Path, target_url: str, target_data: Path) -> None:
                 "0003_receipts",
                 "0004_capture",
                 "0005_items",
+                "0006_products",
                 SCHEMA_VERSION,
             ) and financial_fingerprint(conn) != manifest.get("financial_hash"):
                 raise ValueError("restored_financial_mismatch")
@@ -417,6 +426,7 @@ def restore_backup(source: Path, target_url: str, target_data: Path) -> None:
                 "0003_receipts",
                 "0004_capture",
                 "0005_items",
+                "0006_products",
                 SCHEMA_VERSION,
             ) and attachment_fingerprint(
                 conn,
@@ -426,6 +436,10 @@ def restore_backup(source: Path, target_url: str, target_data: Path) -> None:
                 items_only=manifest["schema_version"] == "0005_items",
             ) != manifest.get("attachment_hash"):
                 raise ValueError("restored_attachment_metadata_mismatch")
+            if manifest["schema_version"] == "0007_recurring" and recurring_fingerprint(
+                conn
+            ) != manifest.get("recurring_hash"):
+                raise ValueError("restored_recurring_mismatch")
         for name, expected in manifest["files"].items():
             if name.startswith("attachments/") and sha256(target_data / name) != expected:
                 raise ValueError("restored_attachment_mismatch")
@@ -435,3 +449,15 @@ def restore_backup(source: Path, target_url: str, target_data: Path) -> None:
                 run.last_restore_verified_at = now()
     finally:
         restore_engine.dispose()
+
+
+def recurring_fingerprint(conn: Any) -> str:
+    conn.execute(text("SET LOCAL timezone TO 'UTC'"))
+    digest = hashlib.sha256()
+    for table in ("recurring_rules", "recurring_occurrences"):
+        for row in conn.execute(
+            text(f'SELECT row_to_json(t)::text FROM "{table}" t ORDER BY row_to_json(t)::text')
+        ):
+            digest.update(row[0].encode())
+            digest.update(b"\n")
+    return digest.hexdigest()

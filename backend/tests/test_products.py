@@ -193,7 +193,17 @@ def test_previous_schema_backup_restores_and_upgrade_preserves_review(
             legacy.setattr(
                 backup,
                 "BACKUP_TABLES",
-                tuple(t for t in backup.BACKUP_TABLES if t not in {"products", "product_aliases"}),
+                tuple(
+                    t
+                    for t in backup.BACKUP_TABLES
+                    if t
+                    not in {
+                        "products",
+                        "product_aliases",
+                        "recurring_rules",
+                        "recurring_occurrences",
+                    }
+                ),
             )
             legacy.setattr(
                 backup,

@@ -156,8 +156,8 @@ erDiagram
 
 | 表 / 階段 | 欄位 | 約束 / 計算 |
 |---|---|---|
-| `recurring_rules` / 1 | Owned、template JSONB、frequency、interval、anchor_date、local_time、timezone、end_on?、next_due_at、posting_mode、enabled、revision | posting_mode=auto_post/expect_only；template 有 schema version；月末 / DST 規則見 02 §7；產生交易使用共同 ledger service |
-| `recurring_occurrences` / 1 | Owned、rule_id、scheduled_local_date、scheduled_at、expected_amount、currency、status、transaction_id?、actual_verified_at?、rule_revision | `(rule_id,scheduled_local_date)` 唯一；status=expected/posted/matched/skipped；重啟不能重複入帳；預期金額保存當期版本 |
+| `recurring_rules` / 1 | Owned、template JSONB、frequency、interval、anchor_date、local_time、timezone、end_on?、next_local_date?、next_due_at?、posting_mode、enabled、revision | posting_mode=auto_post/expect_only；template 有 schema version；月末 / DST 規則見 02 §7；產生交易使用共同 ledger service |
+| `recurring_occurrences` / 1 | Owned、rule_id、scheduled_local_date、scheduled_at、expected_amount、currency、status、transaction_id?、actual_verified_at?、rule_revision、template JSONB、posting_mode | `(rule_id,scheduled_local_date)` 唯一；status=expected/posted/matched/skipped；重啟不能重複入帳；預期金額保存當期版本 |
 | `subscriptions` / 3 | Owned、name、rule_id、trial_ends_on?、remind_days、usage_frequency?、archived_at? | rule_id 唯一；金額 / 幣別讀該週期規則，不另外維護衝突值；預期 / 實際比較不能把自動產生的帳目視為已核實扣款 |
 | `budgets` / 3 | Owned、month DATE、category_id、currency、limit_amount、rollover_amount、revision | month 必須月初；owner/month/category/currency 唯一；支出按快照匯率政策；父子預算加總規則避免重複 |
 | `savings_goals` / 3 | Owned、name、target_amount、currency、target_date、expected_return、priority?、status | 收益率為假設，保存版本；期限已過 / 已達標 / 零報酬都有明確結果 |
@@ -377,3 +377,16 @@ DB schema 仍為 `0006_products`，沒有 migration。ParsedReceipt 新增可空
 - `total_status`：final／before_tip／unclear。
 
 所有金額使用既有 Money decimal string／null，不用浮點數。原本的 tax／tip／amount 繼續保存，不能被核對候選覆寫。API `DraftOutput.charge_review` 提供 tax、tip、service_charge、amount、含稅／小費狀態與提醒，是唯讀衍生資料，沒有新增正式分錄或可變原始稅費欄。人工修改只更新 proposal；確認交易仍用既有 ledger service。舊 JSON 沒有新欄位時回傳 null，原始 snapshot 不回填新欄。
+
+
+## D1-05 已交付週期核心：0007_recurring（2026-10-01）
+
+- `recurring_rules` 與 `recurring_occurrences` 實體已建立。頻率目前為 daily / weekly / monthly；interval 1–120。`local_time` 保存不含時區的整秒 ISO 時間，`timezone` 在 API 驗證 IANA ZoneInfo。範本為 `{schema_version: 1, transaction: TransactionInput}`，其中 occurred_on 在實際入帳時改為 scheduled_local_date。
+- `next_local_date` 是獨立的當地曆日游標，`next_due_at` 為 UTC 到期 instant；結束後兩者為 NULL。不可從 DST 正規化後的 UTC 時間反推原排程日。月底以原 anchor_date 的日數 clamp 至當月末日，下月恢復原日數，不把二月的 28/29 當新錨點。
+- DST gap 移到第一個有效 wall-clock 秒（例如洛杉磯 02:30 → 03:00）；fold 使用第一次（fold=0），每個 scheduled_local_date 只產生一次。規則日曆獨立於帳本時區；occurrence 日期亦用於 ledger occurred_on。
+- Occurrence 保存當期 rule_revision、schema-versioned template、posting_mode、expected_amount（Decimal）與帳戶 currency。規則修改不改舊範本或已入帳金額。Unique `(rule_id, scheduled_local_date)` 跨 revision 去重；transaction_id 唯一，rule / transaction 皆有複合 owner FK。
+- 掃描在 maintenance shared lock、scheduler leader lock、owner BookSettings lock 下，同一 commit 保存 occurrence、job 與游標。`auto_post` handler 以 job lease fencing、BookSettings lock 與 `recurring:<occurrence UUID>` ledger idempotency key，在頂層 transaction 內呼叫 create_transaction 並更新 occurrence；無 savepoint、無直接 postings 寫入。失敗整筆回滾；提交成功但 job ACK 前 crash 時重試只完成 ACK。
+- `expect_only` 不建立 ledger job / transaction。`auto_post` 完成時 status=posted，但 actual_verified_at 保持 NULL，不能宣稱已由銀行確認；matched 與人工核實／Web 對帳尚未實作。
+- `end_on` 包含當地該日。建立規則可從過去錨點補跑；每批預設 100 筆（service 測試可指定 1–1000），剩餘工作保留在游標，下一掃描接續。
+- 更新須提供 expected_revision；啟用規則仍有到期游標時回 409 catchup_pending，先補跑後才能修改，以免把未產生的舊日期套用新範本。停用不受此限制，會取消已排隊的 auto_post occurrence（skipped），但不撤銷已入帳交易。重新啟用與一般修改從修改時刻之後的首個排程日開始，不補停用窗口；先前 expected-only 帳單保留。縮短 end_on 會取消超出新結束日的未入帳 auto_post。
+- 新表納入完整 pg_dump、備份 counts 與 recurring_hash。還原比對全列 fingerprint，包含 revision／游標／transaction linkage；沿用舊 schema 的 financial / attachment fingerprint 驗證，接受 0006_products 備份。Jobs 與 ledger idempotency records 由完整 DB dump 保存，還原後延續去重保證。
