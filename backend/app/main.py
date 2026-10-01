@@ -69,6 +69,7 @@ from app.core.security import (
 )
 from app.ledger.routes import router as ledger_router
 from app.receipts.routes import router as receipts_router
+from app.recurring.routes import router as recurring_router
 
 
 @asynccontextmanager
@@ -89,6 +90,7 @@ app = FastAPI(
 PREFIX = "/api/v1"
 
 app.include_router(ledger_router)
+app.include_router(recurring_router)
 app.include_router(receipts_router)
 app.include_router(capture_router)
 app.include_router(item_router)

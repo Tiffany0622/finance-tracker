@@ -549,3 +549,56 @@ class CaptureBridge(Base):
     __tablename__ = "capture_bridges"
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), primary_key=True)
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class RecurringRule(Owned, Base):
+    __tablename__ = "recurring_rules"
+    template: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    frequency: Mapped[str]
+    interval: Mapped[int]
+    anchor_date: Mapped[date] = mapped_column(Date)
+    local_time: Mapped[str] = mapped_column(String(8))
+    timezone: Mapped[str] = mapped_column(String(100))
+    end_on: Mapped[date | None] = mapped_column(Date)
+    next_local_date: Mapped[date | None] = mapped_column(Date)
+    next_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    posting_mode: Mapped[str]
+    enabled: Mapped[bool] = mapped_column(default=True)
+    revision: Mapped[int] = mapped_column(default=1)
+    __table_args__ = (
+        UniqueConstraint("owner_id", "id"),
+        CheckConstraint("frequency IN ('daily','weekly','monthly')"),
+        CheckConstraint("interval BETWEEN 1 AND 120"),
+        CheckConstraint("posting_mode IN ('auto_post','expect_only')"),
+        CheckConstraint("revision > 0"),
+        CheckConstraint("end_on IS NULL OR end_on >= anchor_date"),
+        Index("ix_recurring_rules_due", "enabled", "next_due_at"),
+    )
+
+
+class RecurringOccurrence(Owned, Base):
+    __tablename__ = "recurring_occurrences"
+    rule_id: Mapped[uuid.UUID]
+    scheduled_local_date: Mapped[date] = mapped_column(Date)
+    scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expected_amount: Mapped[Decimal] = mapped_column(Numeric(32, 18))
+    currency: Mapped[str] = mapped_column(ForeignKey("currencies.code"))
+    status: Mapped[str] = mapped_column(default="expected")
+    transaction_id: Mapped[uuid.UUID | None]
+    actual_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    rule_revision: Mapped[int]
+    template: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    posting_mode: Mapped[str]
+    __table_args__ = (
+        UniqueConstraint("rule_id", "scheduled_local_date"),
+        UniqueConstraint("transaction_id"),
+        ForeignKeyConstraint(
+            ["owner_id", "rule_id"], ["recurring_rules.owner_id", "recurring_rules.id"]
+        ),
+        ForeignKeyConstraint(
+            ["owner_id", "transaction_id"], ["transactions.owner_id", "transactions.id"]
+        ),
+        CheckConstraint("status IN ('expected','posted','matched','skipped')"),
+        CheckConstraint("rule_revision > 0"),
+        CheckConstraint("posting_mode IN ('auto_post','expect_only')"),
+    )

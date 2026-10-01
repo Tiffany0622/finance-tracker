@@ -12,6 +12,7 @@ from app.core.db import SCHEDULER_LOCK, check_schema, transaction
 from app.core.jobs import apply_probe, claim, dispatch_outbox, enqueue, finish, heartbeat
 from app.core.models import BackupRun, User, now
 from app.receipts.service import collect_garbage
+from app.recurring.service import post_occurrence, scan_due
 
 log = logging.getLogger("finance.worker")
 stop = threading.Event()
@@ -59,6 +60,8 @@ def run_once() -> bool:
     try:
         if kind in {"probe", "event_ack"}:
             apply_probe(job_id, token)
+        elif kind == "recurring_post":
+            post_occurrence(job_id, token)
         elif kind == "backup":
             create_backup(job_id)
         else:
@@ -82,6 +85,15 @@ def main() -> None:
     scheduler.add_job(collect_garbage, "interval", minutes=5, coalesce=True, max_instances=1)
     scheduler.add_job(
         schedule_backup,
+        "interval",
+        seconds=60,
+        coalesce=True,
+        max_instances=1,
+        misfire_grace_time=3600,
+        next_run_time=now(),
+    )
+    scheduler.add_job(
+        scan_due,
         "interval",
         seconds=60,
         coalesce=True,

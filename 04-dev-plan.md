@@ -77,7 +77,7 @@
 | D1-02 | A-03, A-04 | D1-01, D0-04 | 匯率 provider / 人工匯率、跨幣轉帳、手動估值、每日淨資產；歷史與當期換算分開，缺率 / 過期 / 漏快照有狀態；原幣及 book 精度不丟失 | DOING |
 | D1-03 | T-01, T-03, T-04, T-09, T-12 | D1-01 | 收支 CRUD、兩層分類、標籤、商家、查詢分頁、修訂 / 作廢 / 部分退款；底層支援分類分攤；重複提交、超額退款、併發修訂測試 | DOING |
 | D1-04 | T-05 | D1-03 | 附件上傳 / 安全預覽 / 授權下載、多圖收據、metadata；MIME / 大小 / 像素 / 路徑驗證，檔案與 DB 崩潰恢復、HEIC 相容性有紀錄 | DONE |
-| D1-05 | T-06, A-05 | D1-02, D1-03, D0-04 | 週期交易含月末 / DST / 喚醒補跑；Web 對帳列差額，調整必須確認理由，不能直接覆寫餘額；相同 occurrence 不重複入帳 | TODO |
+| D1-05 | T-06, A-05 | D1-02, D1-03, D0-04 | 週期交易含月末 / DST / 喚醒補跑；Web 對帳列差額，調整必須確認理由，不能直接覆寫餘額；相同 occurrence 不重複入帳 | VERIFY |
 | D1-06 | R-01, R-02, R-03, R-04, R-07, R-12 | D1-02, D1-03 | 共用 analytics、固定快照、Web 收支 / 分類 / 趨勢 / 淨資產與明細連動；儲蓄率零收入處理；未到階段的預算 / 投資區明示未啟用 | DOING |
 | D1-07 | R-09, R-09A, E-08 | D1-04, D1-06 | CSV 明細 / 彙總 / metadata ZIP；UTF-8、引號換行、文字公式防護；另有全量 CSV / JSON + schema / 附件索引，不混同報表；權限與單向性驗證 | DOING |
 | D1-08 | E-07, RV-01, RV-02, RV-03, RV-04, RV-06 | D1-04, D1-05, D1-06, D1-07, D0-05, D0-07 | 真實帳本結構與附件一致備份後隔離還原；Web / CSV 預期值一致、匯出中改帳不混快照；Numbers CSV 與 iPhone Safari 實測；10 萬筆報表效能記錄 | DOING |
@@ -314,3 +314,12 @@ D1-03 已交付的交易主檔、修訂、owner 權限及正式記帳服務足�
 | 匯入 / 家庭 / 順序變更前 | Q11 檔案格式、Q13 多使用者、Q14 排程 | 提供一般匯入 / 單使用者；家庭功能另立範圍，不自行新增共享權限；保留目前 Phase 順序 |
 
 每階段發布前，核對本階段任務及依賴、migration 與備份還原、受影響圖表及輸出、未驗證項目、資料流開關、Git 機密排除、啟動與回復說明。Phase 6 核對全部 P0；Phase 7 核對全部 P1；Phase 8 逐項發布。報告應說明實際完成範圍，不能把 TODO 或未測的環境相容性包成「全部完成」。
+
+
+### D1-05 週期交易核心（2026-10-01）
+
+- 已實作 `0007_recurring`、owner-scoped 規則建立／列表／revision 更新與 occurrence 分頁查詢；OpenAPI 與 TypeScript 契約同步。
+- 每日／每週／每月、自訂間隔、短月保留原錨點、IANA 時區、DST、停用與 inclusive `end_on`；worker 啟動即掃描，每 60 秒持續補跑，預設每批 100 筆。
+- `auto_post` 經 durable job 與既有 `ledger.create_transaction` 入帳；`expect_only` 僅保存預期帳單。Occurrence 唯一鍵、範本快照、lease fencing 與同交易提交防止掃描、restart、retry 重複入帳；不將自動入帳當作已核實扣款。
+- 備份包含新表 row counts 與獨立 fingerprint，隔離還原後可處理 pending job。
+- 驗證證據見 [recurring-core.md](docs/verification/recurring-core.md)。D1-05 保持 **VERIFY**；Web 對帳差額、附理由的確認調整 UI、週期規則管理 UI 與補跑進度 UI 尚未交付，未標 DONE。年度頻率亦仍待後續擴充。
